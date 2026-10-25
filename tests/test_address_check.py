@@ -58,3 +58,21 @@ def test_ipv6_and_multiple_pi_addresses_match_any():
     assert address_ok(rec("fd00::5"), pis) is True
     assert address_ok(rec("fd00::6"), pis) is False
     assert address_ok(rec(flag="flagged"), pis) is False
+
+
+def test_hostname_host_yields_no_address():
+    from datetime import datetime, timezone
+    from tang_monitor.address_check import success_address
+    from tang_monitor.records import LoggedRequest, TangRequest
+    e = LoggedRequest(TangRequest(datetime(2026, 1, 1, tzinfo=timezone.utc), "10.0.0.5",
+                                  "pi.lan:7500", "rec", 200), "d", True)
+    assert success_address(e) is None
+
+
+def test_ipv6_host_normalized_to_canonical_form():
+    from datetime import datetime, timezone
+    from tang_monitor.address_check import success_address
+    from tang_monitor.records import LoggedRequest, TangRequest
+    e = LoggedRequest(TangRequest(datetime(2026, 1, 1, tzinfo=timezone.utc), "10.0.0.5",
+                                  "[FD00:0:0::5]:7500", "rec", 200), "d", True)
+    assert success_address(e) == "fd00::5"

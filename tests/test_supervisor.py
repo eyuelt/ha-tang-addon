@@ -62,3 +62,17 @@ async def test_set_state_posts_bearer_token(aiohttp_client):
     await sup.fire_event("tang_x", {"b": 2})
     assert seen[0] == ("POST", "/core/api/states/sensor.x", "Bearer tok", {"state": "on", "attributes": {"a": 1}})
     assert seen[1] == ("POST", "/core/api/events/tang_x", "Bearer tok", {"b": 2})
+
+
+async def test_supervisor_normalizes_and_ignores_non_ip(aiohttp_client):
+    body = {"data": {"interfaces": [{"ipv4": {"address": ["not-an-ip/24"]},
+                                     "ipv6": {"address": ["FD00:0:0::5/64"]}}]}}
+
+    async def net(request):
+        return web.json_response(body)
+
+    app = web.Application()
+    app.router.add_get("/network/info", net)
+    client = await aiohttp_client(app)
+    sup = Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
+    assert await sup.pi_addresses() == {"fd00::5"}

@@ -1,4 +1,5 @@
 """Pure per-device address-check logic (flag states)."""
+import ipaddress
 from dataclasses import replace
 from datetime import datetime
 
@@ -7,12 +8,22 @@ from .http_parse import host_address
 from .records import LoggedRequest
 
 
+def canonical_ip(value: str | None) -> str | None:
+    """Canonical compressed form of an IP literal; None for hostnames or junk."""
+    if not value:
+        return None
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        return None
+
+
 def success_address(entry: LoggedRequest) -> str | None:
     """The address a successful request used, or None if it must not update a device."""
     r = entry.request
     if r.status != 200 or not entry.known or r.kind not in ("adv", "rec"):
         return None
-    return host_address(r.host)
+    return canonical_ip(host_address(r.host))
 
 
 def apply_success(prev: DeviceRecord | None, device: str, address: str, at: datetime,

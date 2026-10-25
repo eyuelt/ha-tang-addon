@@ -3,6 +3,8 @@ import logging
 
 import aiohttp
 
+from .address_check import canonical_ip
+
 log = logging.getLogger(__name__)
 _TIMEOUT = aiohttp.ClientTimeout(total=10)
 
@@ -39,7 +41,9 @@ class Supervisor:
             for iface in body["data"]["interfaces"]:
                 for fam in ("ipv4", "ipv6"):
                     for a in (iface.get(fam) or {}).get("address") or []:
-                        out.add(a.split("/", 1)[0])
+                        ip = canonical_ip(a.split("/", 1)[0])
+                        if ip is not None:
+                            out.add(ip)
         except Exception as e:  # noqa: BLE001 - any failure means "unknown"
             self._fail("network_info", e)
             return None
