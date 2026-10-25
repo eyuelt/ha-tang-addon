@@ -3,6 +3,7 @@
 const POLL_MS = 10000;
 const openDetails = new Set();
 let lastState = null;
+let lastText = null;
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -45,22 +46,32 @@ function result(r) {
   return "error";
 }
 
-function copyBtn(text) {
+function fallbackCopy(pre) {
+  const range = document.createRange();
+  range.selectNodeContents(pre);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try { return document.execCommand("copy"); } catch (e) { return false; }
+}
+
+function copyBtn(text, pre) {
   const b = h("button", { type: "button" }, "Copy");
   b.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      b.textContent = "Copied";
-    } catch (e) {
-      b.textContent = "Copy failed";
+    let ok = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
     }
+    if (!ok) ok = fallbackCopy(pre);
+    b.textContent = ok ? "Copied" : "Copy failed";
     setTimeout(() => { b.textContent = "Copy"; }, 1500);
   });
   return b;
 }
 
 function cmd(text) {
-  return h("div", { class: "cmd" }, h("pre", {}, text), copyBtn(text));
+  const pre = h("pre", {}, text);
+  return h("div", { class: "cmd" }, pre, copyBtn(text, pre));
 }
 
 function findSteps(steps) {
@@ -169,15 +180,21 @@ function renderTestCommands(s) {
 
 function render(s) {
   const app = document.getElementById("app");
-  app.replaceChildren(renderStatus(s), renderBanner(s), renderAlerts(s), renderHistory(s),
-    renderKeys(s), renderDevices(s), renderTestCommands(s));
+  app.replaceChildren(...[renderStatus(s), renderBanner(s), renderAlerts(s), renderHistory(s),
+    renderKeys(s), renderDevices(s), renderTestCommands(s)].flat().filter(Boolean));
 }
 
 async function refresh() {
   try {
     const r = await fetch("api/state");
     if (!r.ok) throw new Error("HTTP " + r.status);
-    lastState = await r.json();
+    const text = await r.text();
+    const sel = window.getSelection();
+    const app = document.getElementById("app");
+    const selecting = sel && !sel.isCollapsed && sel.anchorNode && app.contains(sel.anchorNode);
+    if (text === lastText || selecting) return;
+    lastText = text;
+    lastState = JSON.parse(text);
     render(lastState);
   } catch (e) {
     const app = document.getElementById("app");
