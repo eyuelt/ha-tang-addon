@@ -60,8 +60,11 @@ async def start_tang_server(
             await asyncio.wait_for(serve(reader, writer, state), timeout)
         except asyncio.CancelledError:
             raise
-        except Exception as e:
+        except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, ValueError,
+                ConnectionError, TimeoutError) as e:
             log.debug("connection from %s failed: %r", ip, e)
+        except Exception:
+            log.exception("failed handling connection from %s", ip)
         finally:
             try:
                 writer.close()

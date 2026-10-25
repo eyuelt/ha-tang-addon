@@ -20,7 +20,8 @@ async def server(tmp_path):
 
     async def make(**kw):
         kw.setdefault("report_loopback", True)
-        s = await start_tang_server("127.0.0.1", 0, tmp_path, on_request, tangd=FAKE, **kw)
+        kw.setdefault("tangd", FAKE)
+        s = await start_tang_server("127.0.0.1", 0, tmp_path, on_request, **kw)
         servers.append(s)
         return s, s.sockets[0].getsockname()[1], reports
 
@@ -108,3 +109,15 @@ async def test_loopback_not_reported_by_default(server):
     assert out.startswith(b"HTTP/1.1 200")
     await settle()
     assert reports == []
+
+
+async def test_missing_tangd_logs_error_status_none_and_keeps_serving(server, tmp_path, caplog):
+    import logging
+    _, port, reports = await server(tangd=("/nonexistent/tangd",))
+    with caplog.at_level(logging.WARNING, logger="tang_monitor.tang_server"):
+        out = await exchange(port, b"GET /adv HTTP/1.1\r\nHost: h\r\n\r\n")
+        out2 = await exchange(port, b"GET /adv HTTP/1.1\r\nHost: h\r\n\r\n")
+        await settle()
+    assert out == b"" and out2 == b""
+    assert any(r.levelno >= logging.WARNING for r in caplog.records)
+    assert len(reports) == 2 and all(r.status is None for r in reports)
