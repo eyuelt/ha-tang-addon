@@ -23,7 +23,15 @@ Keep port 7500 reachable only from your home network. Do not forward it from the
 
    `<disk>` is the encrypted partition (for example `/dev/nvme0n1p2`), `<pi-address>` is the Pi's reserved address,
    and the signing fingerprint is shown in the dashboard's Keys section.
-4. Test it with the dashboard's "How to test" section.
+4. Test it (this prints nothing secret and ends with `OK` on success):
+
+   ```
+   sudo clevis luks pass -d <disk> -s <slot> >/dev/null && echo OK
+   ```
+
+   Find `<disk>` with `lsblk -o NAME,FSTYPE,FSVER,MOUNTPOINTS` and `<slot>` with `sudo clevis luks list -d <disk>`.
+   The dashboard's "How to test" and "How to fix" sections will appear in a later version, once the commands
+   have been verified.
 
 ## Options
 

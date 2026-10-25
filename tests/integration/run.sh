@@ -7,7 +7,8 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=tang-addon:test
 NET=tangtest
-TANG=tang
+TANG=tangtest-addon
+ALIAS=tang   # the name clients use: http://tang:7500
 CLIENT=tangtest-client
 # A named volume, not a macOS bind mount: Docker Desktop's file sharing rejects tangd-keygen's chmod, and HA's
 # /data is a native Linux filesystem anyway.
@@ -44,7 +45,7 @@ docker run --rm -v "$DATA:/data" debian:trixie \
   sh -c 'echo "{\"known_devices\":[],\"address_reserved\":false}" > /data/options.json'
 
 start_tang() {
-  docker run -d --name "$TANG" --network "$NET" -v "$DATA:/data" "$@" "$IMAGE" >/dev/null
+  docker run -d --name "$TANG" --network "$NET" --network-alias "$ALIAS" -v "$DATA:/data" "$@" "$IMAGE" >/dev/null
 }
 
 api_state() {
@@ -76,7 +77,7 @@ SIG=$(echo "$STATE" | jqc -r '.keys[] | select(.use=="signing") | .s256')
 CLIENT_IP=$(docker inspect -f "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "$CLIENT")
 
 echo "== clevis encrypt/decrypt through the add-on"
-docker exec "$CLIENT" sh -c "echo hello | clevis encrypt tang '{\"url\":\"http://$TANG:7500\",\"thp\":\"$SIG\"}' > /hello.jwe"
+docker exec "$CLIENT" sh -c "echo hello | clevis encrypt tang '{\"url\":\"http://$ALIAS:7500\",\"thp\":\"$SIG\"}' > /hello.jwe"
 OUT=$(docker exec "$CLIENT" sh -c 'clevis decrypt < /hello.jwe')
 [ "$OUT" = hello ] || fail "decrypt output was '$OUT'"
 
@@ -123,7 +124,7 @@ echo "== LUKS2 one-step test script"
 if LOOP=$(docker exec "$CLIENT" sh -c 'truncate -s 64M /disk.img && losetup -f --show /disk.img' 2>/dev/null) \
     && [ -n "$LOOP" ] && docker exec "$CLIENT" test -b "$LOOP"; then
   docker exec "$CLIENT" sh -c "printf %s test | cryptsetup luksFormat --type luks2 --batch-mode --key-file=- $LOOP"
-  docker exec "$CLIENT" bash -c "clevis luks bind -k- -y -d $LOOP tang '{\"url\":\"http://$TANG:7500\"}' <<< test"
+  docker exec "$CLIENT" bash -c "clevis luks bind -k- -y -d $LOOP tang '{\"url\":\"http://$ALIAS:7500\"}' <<< test"
 
   # Restart the add-on (same /data, so same keys) with the commands un-hidden. The fake SUPERVISOR_TOKEN also
   # proves container env reaches the app (s6-overlay must not strip it) and that a dead Supervisor is survivable.

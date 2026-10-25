@@ -15,6 +15,7 @@ panel_icon: mdi:lock-network
 panel_title: Tang
 homeassistant_api: true
 hassio_api: true
+watchdog: "tcp://[HOST]:[PORT:7500]"
 ports:
   7500/tcp: 7500
 ports_description:
