@@ -109,3 +109,10 @@ async def test_set_pi_addresses_none_keeps_flags(tmp_path):
     assert snap["devices"][0]["flag"] == "flagged"
     assert snap["devices"][0]["address_ok"] is None
     assert snap["devices"][0]["commands"] is None
+
+
+async def test_snapshot_commands_shown_with_env_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("TANG_COMMANDS_VERIFIED", "1")
+    snap = make_state(tmp_path).snapshot()
+    assert snap["commands_verified"] is True
+    assert set(snap["test_commands"]) == {"find", "test", "one_step_test"}

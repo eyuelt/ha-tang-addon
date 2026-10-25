@@ -1,11 +1,17 @@
 """Shell commands the user runs ON the encrypted device to repoint a Clevis Tang binding."""
 import json
+import os
 from typing import Literal
 
 from .keys import KeyInfo
 
 # Hidden in the dashboard until the commands are verified on a real disk.
 COMMANDS_VERIFIED: bool = False
+
+
+def commands_verified() -> bool:
+    """True when the constant is set, or TANG_COMMANDS_VERIFIED=1 (used only by the integration test)."""
+    return bool(COMMANDS_VERIFIED) or os.environ.get("TANG_COMMANDS_VERIFIED") == "1"
 
 
 def tang_config(pi_address: str, port: int, signing: KeyInfo) -> str:

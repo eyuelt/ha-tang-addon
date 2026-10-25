@@ -93,3 +93,18 @@ def test_found_set_after_found_echo_not_in_action(mode):
     assert lines[i + 1] == "found=1"
     assert "found=1" not in lines[i + 2]
     assert lines[i + 2].startswith("clevis luks")
+
+
+@pytest.mark.parametrize("env,expected", [(None, False), ("1", True), ("0", False), ("true", False), ("", False)])
+def test_commands_verified_env_override(monkeypatch, env, expected):
+    if env is None:
+        monkeypatch.delenv("TANG_COMMANDS_VERIFIED", raising=False)
+    else:
+        monkeypatch.setenv("TANG_COMMANDS_VERIFIED", env)
+    assert commands.commands_verified() is expected
+
+
+def test_commands_verified_follows_constant(monkeypatch):
+    monkeypatch.delenv("TANG_COMMANDS_VERIFIED", raising=False)
+    monkeypatch.setattr(commands, "COMMANDS_VERIFIED", True)
+    assert commands.commands_verified() is True

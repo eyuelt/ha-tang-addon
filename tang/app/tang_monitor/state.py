@@ -73,7 +73,7 @@ class AppState:
         return any(k.use == "signing" for k in self.keys)
 
     def snapshot(self) -> dict:
-        verified = bool(commands.COMMANDS_VERIFIED)
+        verified = commands.commands_verified()
         primary = self._primary_address()
         can_cmd = verified and primary is not None and self._has_signing()
         exchange = [k for k in self.keys if k.use == "exchange"]
