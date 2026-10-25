@@ -21,12 +21,15 @@ class DeviceStore:
         self._devices: dict[str, DeviceRecord] = {}
         raw = jsonfile.load(path, [])
         try:
+            if not isinstance(raw, list):
+                raise TypeError("expected a list")
             for d in raw:
                 rec = DeviceRecord(d["device"], d["last_ok_address"],
                                    datetime.fromisoformat(d["last_ok_at"]), d.get("flag", "none"))
                 self._devices[rec.device] = rec
         except (KeyError, TypeError, ValueError):
             self._devices = {}
+            jsonfile.quarantine(path)
 
     def _persist(self) -> None:
         jsonfile.save(self._path, [

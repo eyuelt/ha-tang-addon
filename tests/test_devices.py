@@ -36,3 +36,17 @@ def test_corrupt_devices_file_starts_empty(tmp_path: Path):
     s = DeviceStore(p)
     assert s.all() == []
     assert (tmp_path / "devices.json.corrupt").exists()
+
+
+import pytest
+
+
+@pytest.mark.parametrize("content", ["{}", '[{"x": 1}]', "[1]", '"s"'])
+def test_wrong_shape_is_quarantined(tmp_path: Path, content):
+    p = tmp_path / "devices.json"
+    p.write_text(content)
+    s = DeviceStore(p)
+    assert s.all() == []
+    assert (tmp_path / "devices.json.corrupt").read_text() == content
+    s.put(DeviceRecord("a", "1.1.1.1", T))
+    assert (tmp_path / "devices.json.corrupt").read_text() == content

@@ -41,9 +41,12 @@ class RequestLog:
         self._limit = limit
         raw = jsonfile.load(path, [])
         try:
+            if not isinstance(raw, list):
+                raise TypeError("expected a list")
             self._entries = [_from_json(d) for d in raw][-limit:]  # oldest first
         except (KeyError, TypeError, ValueError):
             self._entries = []
+            jsonfile.quarantine(path)
 
     def append(self, entry: LoggedRequest) -> None:
         self._entries.append(entry)

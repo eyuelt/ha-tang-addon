@@ -8,14 +8,17 @@ from pathlib import Path
 def load(path: Path, default):
     """Return parsed JSON, or `default` if missing. A corrupt file is moved to `<name>.corrupt`."""
     try:
-        text = path.read_text()
+        return json.loads(path.read_text())
     except FileNotFoundError:
         return default
-    try:
-        return json.loads(text)
-    except ValueError:
-        os.replace(path, path.with_name(path.name + ".corrupt"))
+    except ValueError:  # JSONDecodeError and UnicodeDecodeError are both ValueErrors
+        quarantine(path)
         return default
+
+
+def quarantine(path: Path) -> None:
+    """Move a bad file aside to `<name>.corrupt` so it is never overwritten."""
+    os.replace(path, path.with_name(path.name + ".corrupt"))
 
 
 def save(path: Path, data) -> None:

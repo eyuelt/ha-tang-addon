@@ -41,3 +41,15 @@ def test_corrupt_log_file_starts_empty_and_is_kept_as_corrupt(tmp_path: Path):
     assert (tmp_path / "log.json.corrupt").read_text() == "{not json"
     log.append(_entry(1))
     assert len(RequestLog(p).recent()) == 1
+
+
+import pytest
+
+
+@pytest.mark.parametrize("content", ["{}", '[{"x": 1}]', "[1]"])
+def test_wrong_shape_log_is_quarantined(tmp_path: Path, content):
+    p = tmp_path / "log.json"
+    p.write_text(content)
+    log = RequestLog(p)
+    assert log.recent() == []
+    assert (tmp_path / "log.json.corrupt").read_text() == content
