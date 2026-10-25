@@ -4,6 +4,8 @@ import socket
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
+from .address_check import canonical_ip
+
 
 def _normalize(name: str) -> str:
     return name.lower().rstrip(".")
@@ -32,8 +34,8 @@ class Namer:
             return hit[1]
         try:
             raw = await asyncio.wait_for(asyncio.to_thread(self._lookup, ip), self._timeout)
-        except Exception:  # includes TimeoutError
-            raw = None
+        except Exception:  # includes TimeoutError; failures are not cached, so the next call retries
+            return None
         name = _normalize(raw) if raw else None
         self._cache[ip] = (self._now(), name)
         return name
@@ -43,3 +45,11 @@ def is_known(name: str | None, known: list[str]) -> bool:
     if not name:
         return False
     return _normalize(name) in {_normalize(k) for k in known}
+
+
+def is_known_request(name: str | None, ip: str, known: list[str]) -> bool:
+    """Known by resolved name, or by IP literal (canonicalized) in known_devices."""
+    if is_known(name, known):
+        return True
+    cip = canonical_ip(ip)
+    return cip is not None and cip in {canonical_ip(k.strip()) for k in known} - {None}
