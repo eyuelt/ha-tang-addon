@@ -52,7 +52,7 @@ def test_one_step_edit_config_escaping_and_modes():
     cfg = tang_config("192.168.1.112", 7500, SIG)
     edit = one_step_script("edit", [EX1], cfg)
     assert 'NEW_TANG_CONFIG="{\\"url\\":\\"http://192.168.1.112:7500\\",\\"thp\\":\\"SIGS256\\"}"' in edit
-    assert 'clevis luks edit -d "$d" -s "$s" -c "$NEW_TANG_CONFIG" && found=1' in edit
+    assert 'clevis luks edit -d "$d" -s "$s" -c "$NEW_TANG_CONFIG"\n' in edit
     assert edit.startswith("sudo sh -c '")
     test = one_step_script("test", [EX1], None)
     assert "NEW_TANG_CONFIG" not in test
@@ -83,3 +83,13 @@ def test_device_commands_shape():
 
 def test_commands_hidden_by_default():
     assert commands.COMMANDS_VERIFIED is False
+
+
+@pytest.mark.parametrize("mode", ["edit", "test"])
+def test_found_set_after_found_echo_not_in_action(mode):
+    s = one_step_script(mode, [EX1], tang_config("1.2.3.4", 7500, SIG) if mode == "edit" else None)
+    lines = [l.strip() for l in s.splitlines()]
+    i = lines.index('echo "Found binding to this Tang server: $d slot $s"')
+    assert lines[i + 1] == "found=1"
+    assert "found=1" not in lines[i + 2]
+    assert lines[i + 2].startswith("clevis luks")

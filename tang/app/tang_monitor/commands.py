@@ -53,13 +53,14 @@ for d in $(blkid -t TYPE=crypto_LUKS -o device); do
     case " $TANG_KEY_FINGERPRINT " in *" $kid "*) ;; *) continue ;; esac
     s=$(echo "$tok" | jose fmt -j- -g keyslots -g 0 -u-)
     echo "Found binding to this Tang server: $d slot $s"
+    found=1
     {action}
   done
 done
 [ $found = 1 ] || echo "No binding to this Tang server found"
 '"""
 
-_EDIT_ACTION = 'clevis luks edit -d "$d" -s "$s" -c "$NEW_TANG_CONFIG" && found=1'
+_EDIT_ACTION = 'clevis luks edit -d "$d" -s "$s" -c "$NEW_TANG_CONFIG"'
 _TEST_ACTION = (
     'clevis luks pass -d "$d" -s "$s" >/dev/null && echo "OK: $d slot $s" '
     '|| echo "FAILED: $d slot $s"'
