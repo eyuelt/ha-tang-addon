@@ -1,0 +1,44 @@
+:root {
+  --bg: #f6f7f9; --card: #fff; --fg: #1c2330; --muted: #667085; --line: #e1e5ec;
+  --ok: #1a7f4b; --bad-bg: #fdecec; --bad-fg: #a31d1d; --warn-bg: #fff6d6; --warn-fg: #6b5200;
+  --unk-bg: #fff1e0; --code-bg: #f0f2f6; --accent: #2457d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c; --card: #1d2229; --fg: #e6e9ef; --muted: #98a2b3; --line: #2e3640;
+    --ok: #4cc38a; --bad-bg: #3a1c1e; --bad-fg: #ff9b9b; --warn-bg: #3a3216; --warn-fg: #f2d675;
+    --unk-bg: #3b2a17; --code-bg: #12151a; --accent: #7aa2ff;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 900px; margin: 0 auto; padding: 12px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 8px; }
+.muted { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.status { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+.status .up { color: var(--ok); font-weight: 600; }
+.status .down { color: var(--bad-fg); font-weight: 600; }
+.banner { background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.alert { background: var(--bad-bg); color: var(--bad-fg); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.alert .row { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.alert details { color: var(--fg); margin-top: 8px; }
+details { margin-top: 6px; }
+details details { margin-left: 12px; }
+summary { cursor: pointer; font-weight: 600; }
+button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg); cursor: pointer; }
+button:hover { border-color: var(--accent); }
+pre { background: var(--code-bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px; overflow-x: auto; margin: 4px 0; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+.cmd { display: flex; gap: 8px; align-items: flex-start; }
+.cmd pre { flex: 1; }
+table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+tr.unknown td { background: var(--unk-bg); }
+.tag { font-weight: 600; color: var(--bad-fg); }
+.err { color: var(--bad-fg); }
+code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }
+.scroll { overflow-x: auto; }

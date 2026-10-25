@@ -1,0 +1,189 @@
+"use strict";
+// All server-provided strings are inserted with textContent (via h()), never innerHTML.
+const POLL_MS = 10000;
+const openDetails = new Set();
+let lastState = null;
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+
+function details(id, title, ...kids) {
+  const d = h("details", {}, h("summary", {}, title), ...kids);
+  d.dataset.id = id;
+  if (openDetails.has(id)) d.open = true;
+  d.addEventListener("toggle", () => {
+    if (d.open) openDetails.add(id); else openDetails.delete(id);
+  });
+  return d;
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso);
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const now = new Date();
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return "today " + time;
+  if (d.toDateString() === y.toDateString()) return "yesterday " + time;
+  return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + time;
+}
+
+function result(r) {
+  if (r.kind === "adv" && r.status === 200) return "fetched keys";
+  if (r.kind === "rec" && r.status === 200) return "unlock request answered";
+  return "error";
+}
+
+function copyBtn(text) {
+  const b = h("button", { type: "button" }, "Copy");
+  b.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      b.textContent = "Copied";
+    } catch (e) {
+      b.textContent = "Copy failed";
+    }
+    setTimeout(() => { b.textContent = "Copy"; }, 1500);
+  });
+  return b;
+}
+
+function cmd(text) {
+  return h("div", { class: "cmd" }, h("pre", {}, text), copyBtn(text));
+}
+
+function findSteps(steps) {
+  return steps.map((s, i) => h("div", {}, h("p", {}, (i + 1) + ". " + s.text), cmd(s.command)));
+}
+
+function oneStep(idPrefix, c, withFix) {
+  return details(idPrefix + ":onestep", "Can't tell which binding is the right one?",
+    h("p", { class: "muted" },
+      "This script finds every binding to this Tang server on this machine and acts on each one."),
+    withFix && h("p", {}, "Fix everything it finds:"), withFix && cmd(c.one_step_fix),
+    h("p", {}, "Test everything it finds:"), cmd(c.one_step_test));
+}
+
+const TEST_NOTE = "The test proves this machine can fetch its key from the new address. " +
+  "It does not prove the boot-time network works; only restarting the machine does.";
+
+function fixDetails(dev, c) {
+  return details("fix:" + dev.device, "How to fix",
+    h("p", {}, "1. Find the disk and binding slot."), findSteps(c.find),
+    h("p", {}, "2. Point the binding at this Pi."), cmd(c.fix),
+    h("p", {}, "3. Test it."), cmd(c.test), h("p", { class: "muted" }, TEST_NOTE),
+    oneStep("fix:" + dev.device, c, true));
+}
+
+async function post(path) {
+  try {
+    const r = await fetch(path, { method: "POST" });
+    if (!r.ok && r.status !== 404 && r.status !== 409) alert("Request failed: " + r.status);
+  } catch (e) {
+    alert("Request failed: " + e);
+  }
+  refresh();
+}
+
+function renderStatus(s) {
+  const last = s.requests.find(r => r.known && r.kind === "rec" && r.status === 200);
+  return h("div", { class: "card status" },
+    h("span", { class: s.running ? "up" : "down" }, s.running ? "● Running" : "● Not answering"),
+    h("span", {}, "Last unlock: ", last ? last.device + ", " + fmtTime(last.at) : "none yet"),
+    h("span", {}, s.keys.length + (s.keys.length === 1 ? " key" : " keys")));
+}
+
+function renderBanner(s) {
+  if (s.address_reserved) return null;
+  const addr = s.pi_addresses && s.pi_addresses.length ? s.pi_addresses[0] : "this Pi's address";
+  return h("div", { class: "banner" },
+    "Reserve " + addr + " for this Pi in your router (often called a DHCP reservation or static lease), then turn on 'Address reserved' in this " +
+    "add-on's settings.");
+}
+
+function renderAlerts(s) {
+  return s.devices.filter(d => d.flag !== "none").map(d => {
+    const piAddr = s.pi_addresses && s.pi_addresses.length ? s.pi_addresses[0] : "a different address";
+    const line = d.flag === "fixed_untested"
+      ? "Marked fixed, not yet tested. Run the test below, or restart " + d.device + "."
+      : d.device + " unlocks via " + d.last_ok_address + ", but this Pi is now at " + piAddr +
+        ". It will show the password prompt at boot until this is fixed.";
+    const fixedBtn = d.flag === "flagged" && h("button", { type: "button",
+      onclick: () => post("api/devices/" + encodeURIComponent(d.device) + "/fixed") }, "I've fixed it");
+    return h("div", { class: "alert" },
+      h("div", { class: "row" }, h("span", {}, line), fixedBtn),
+      d.commands && fixDetails(d, d.commands));
+  });
+}
+
+function renderHistory(s) {
+  const rows = s.requests.map(r => h("tr", { class: r.known ? "" : "unknown" },
+    h("td", {}, fmtTime(r.at)),
+    h("td", {}, r.device, !r.known && h("span", { class: "tag" }, " ⚠ unknown")),
+    h("td", { class: "mono" }, r.ip),
+    h("td", { class: result(r) === "error" ? "err" : "" }, result(r))));
+  return [h("h2", {}, "History"), h("div", { class: "scroll" }, h("table", {},
+    h("thead", {}, h("tr", {}, h("th", {}, "When"), h("th", {}, "Who"), h("th", {}, "IP"), h("th", {}, "Result"))),
+    h("tbody", {}, rows.length ? rows : h("tr", {}, h("td", { colspan: 4, class: "muted" }, "No requests yet."))))) ];
+}
+
+function renderKeys(s) {
+  return [h("h2", {}, "Keys"), h("div", { class: "card" },
+    s.keys.length ? s.keys.map(k => h("div", {}, k.use + ": ", h("code", {}, k.s256)))
+      : h("span", { class: "muted" }, "No keys."))];
+}
+
+function renderDevices(s) {
+  const body = s.devices.length ? s.devices.map(d => h("div", { class: "cmd" },
+    h("div", { style: "flex:1" },
+      h("strong", {}, d.device), " via ", h("code", {}, d.last_ok_address), ", " + fmtTime(d.last_ok_at) +
+      ", " + (d.flag === "none" ? "ok" : d.flag === "flagged" ? "needs fixing" : "fixed, untested")),
+    h("button", { type: "button", onclick: () => {
+      if (confirm("Forget " + d.device + "?")) post("api/devices/" + encodeURIComponent(d.device) + "/forget");
+    } }, "Forget")))
+    : h("span", { class: "muted" }, "No devices tracked yet.");
+  return [h("h2", {}, "Devices"), h("div", { class: "card" }, body)];
+}
+
+function renderTestCommands(s) {
+  const t = s.test_commands;
+  if (!t) return null;
+  return [h("h2", {}, "Test a newly bound device"), h("div", { class: "card" },
+    details("test:new", "How to test",
+      h("p", {}, "1. Find the disk and binding slot."), findSteps(t.find),
+      h("p", {}, "2. Test it."), cmd(t.test), h("p", { class: "muted" }, TEST_NOTE),
+      details("test:new:onestep", "Can't tell which binding is the right one?",
+        cmd(t.one_step_test))))];
+}
+
+function render(s) {
+  const app = document.getElementById("app");
+  app.replaceChildren(renderStatus(s), renderBanner(s), renderAlerts(s), renderHistory(s),
+    renderKeys(s), renderDevices(s), renderTestCommands(s));
+}
+
+async function refresh() {
+  try {
+    const r = await fetch("api/state");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    lastState = await r.json();
+    render(lastState);
+  } catch (e) {
+    const app = document.getElementById("app");
+    if (!lastState) app.replaceChildren(h("p", { class: "err" }, "Could not load state: " + e));
+  }
+}
+
+refresh();
+setInterval(refresh, POLL_MS);
