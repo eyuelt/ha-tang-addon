@@ -108,7 +108,7 @@ async function post(path) {
 }
 
 function renderStatus(s) {
-  const last = s.requests.find(r => r.known && r.kind === "rec" && r.status === 200);
+  const last = s.requests.find(r => r.kind === "rec" && r.status === 200);
   return h("div", { class: "card status" },
     h("span", { class: s.running ? "up" : "down" }, s.running ? "● Running" : "● Not answering"),
     h("span", {}, "Last unlock: ", last ? last.device + ", " + fmtTime(last.at) : "none yet"),
@@ -117,15 +117,15 @@ function renderStatus(s) {
 
 function renderBanner(s) {
   if (s.address_reserved) return null;
-  const addr = s.pi_addresses && s.pi_addresses.length ? s.pi_addresses[0] : "this Pi's address";
+  const addr = s.primary_address;
   return h("div", { class: "banner" },
-    "Reserve " + addr + " for this Pi in your router (often called a DHCP reservation or static lease), then turn on 'Address reserved' in this " +
+    (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router (often called a DHCP reservation or static lease), then turn on 'Address reserved' in this " +
     "add-on's settings.");
 }
 
 function renderAlerts(s) {
   return s.devices.filter(d => d.flag !== "none").map(d => {
-    const piAddr = s.pi_addresses && s.pi_addresses.length ? s.pi_addresses[0] : "a different address";
+    const piAddr = s.primary_address || "a different address";
     const line = d.flag === "fixed_untested"
       ? "Marked fixed, not yet tested. Run the test below, or restart " + d.device + "."
       : d.device + " unlocks via " + d.last_ok_address + ", but this Pi is now at " + piAddr +

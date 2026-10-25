@@ -20,6 +20,11 @@ async def make(aiohttp_client, status=200):
     app = web.Application()
     app.router.add_get("/network/info", net)
     app.router.add_post("/core/api/states/{eid}", post)
+
+    async def delete(request):
+        seen.append(("DELETE", request.path, request.headers.get("Authorization"), None))
+        return web.json_response({}, status=status)
+    app.router.add_delete("/core/api/states/{eid}", delete)
     app.router.add_post("/core/api/events/{ev}", post)
     client = await aiohttp_client(app)
     return client, seen
@@ -76,3 +81,56 @@ async def test_supervisor_normalizes_and_ignores_non_ip(aiohttp_client):
     client = await aiohttp_client(app)
     sup = Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
     assert await sup.pi_addresses() == {"fd00::5"}
+
+
+async def test_empty_address_list_is_unknown(aiohttp_client):
+    async def net(request):
+        return web.json_response({"data": {"interfaces": [{"ipv4": {"address": []}, "ipv6": None}]}})
+
+    app = web.Application()
+    app.router.add_get("/network/info", net)
+    client = await aiohttp_client(app)
+    sup = Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
+    assert await sup.pi_addresses() is None
+    assert await sup.network_info() == (None, None)
+
+
+async def _sup_with_net(aiohttp_client, ifaces):
+    async def net(request):
+        return web.json_response({"data": {"interfaces": ifaces}})
+
+    app = web.Application()
+    app.router.add_get("/network/info", net)
+    client = await aiohttp_client(app)
+    return Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
+
+
+async def test_primary_is_first_ipv4_of_primary_interface(aiohttp_client):
+    sup = await _sup_with_net(aiohttp_client, [
+        {"primary": False, "ipv4": {"address": ["10.0.0.1/24"]}},
+        {"primary": True, "ipv4": {"address": ["192.168.1.87/24", "192.168.1.90/24"]},
+         "ipv6": {"address": ["fd00::5/64"]}}])
+    addrs, primary = await sup.network_info()
+    assert primary == "192.168.1.87"
+    assert addrs == {"10.0.0.1", "192.168.1.87", "192.168.1.90", "fd00::5"}
+
+
+async def test_no_primary_interface_gives_none_primary(aiohttp_client):
+    sup = await _sup_with_net(aiohttp_client, [{"primary": False, "ipv4": {"address": ["10.0.0.1/24"]}}])
+    assert (await sup.network_info())[1] is None
+
+
+async def test_remove_state_deletes_with_token(aiohttp_client):
+    client, seen = await make(aiohttp_client)
+    sup = Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
+    await sup.remove_state("binary_sensor.tang_x_address_ok")
+    assert seen == [("DELETE", "/core/api/states/binary_sensor.tang_x_address_ok", "Bearer tok", None)]
+
+
+async def test_remove_state_noop_without_token_and_never_raises(aiohttp_client):
+    client, seen = await make(aiohttp_client)
+    await Supervisor(client.session, None, base=str(client.make_url("")).rstrip("/")).remove_state("sensor.x")
+    assert seen == []
+    await Supervisor(client.session, "tok", base="http://127.0.0.1:1").remove_state("sensor.x")
+    client2, _ = await make(aiohttp_client, status=500)
+    await Supervisor(client2.session, "tok", base=str(client2.make_url("")).rstrip("/")).remove_state("sensor.x")

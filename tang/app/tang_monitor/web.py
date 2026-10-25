@@ -38,6 +38,7 @@ def make_app(state, allow_remotes: frozenset[str] = INGRESS_REMOTES) -> web.Appl
     async def forget(request):
         if not state.forget(request.match_info["device"]):
             raise web.HTTPNotFound()
+        await state.notify_forgotten(request.match_info["device"])
         return web.json_response({"ok": True})
 
     app = web.Application(middlewares=[only_ingress])
@@ -84,7 +85,8 @@ def _demo_state():
             await s.handle_request(TangRequest(at, ip, host, kind, status))
     asyncio.run(feed())
     s.tang_running = True
-    s.set_pi_addresses({"192.168.1.112"})
+    for _ in range(3):  # the flag needs 3 consecutive mismatching checks
+        s.set_pi_addresses({"192.168.1.112"}, primary="192.168.1.112")
     return s
 
 

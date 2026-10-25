@@ -8,7 +8,7 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-from .entities import build_entities, event_data
+from .entities import build_entities, device_slug, event_data
 from .keys import ensure_keys, load_keys
 from .naming import Namer
 from .options import load_options
@@ -62,7 +62,7 @@ async def refresh(state: AppState, sup: Supervisor, session: aiohttp.ClientSessi
     if running != state.tang_running:
         log.info("Tang is %s", "running" if running else "NOT running")
     state.tang_running = running
-    state.set_pi_addresses(await sup.pi_addresses())
+    state.set_pi_addresses(*await sup.network_info())
     await publish(state, sup)
 
 
@@ -90,6 +90,9 @@ async def main(data_dir: Path = DATA_DIR) -> None:
 
     async with aiohttp.ClientSession() as session:
         sup = Supervisor(session, os.environ.get("SUPERVISOR_TOKEN"))
+        async def on_forget(device: str) -> None:
+            await sup.remove_state(f"binary_sensor.tang_{device_slug(device)}_address_ok")
+        state.on_forget = on_forget
         tang = await start_tang_server("0.0.0.0", TANG_PORT, keydir, make_on_request(state, sup))
         runner = web.AppRunner(make_app(state), access_log=None)
         await runner.setup()

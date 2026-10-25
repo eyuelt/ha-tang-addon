@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from tang_monitor.address_check import apply_check, apply_fixed, apply_success, address_ok
+from tang_monitor.address_check import apply_check, apply_fixed, mismatch, apply_success, address_ok
 from tang_monitor.devices import DeviceRecord
 
 T = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -76,3 +76,16 @@ def test_ipv6_host_normalized_to_canonical_form():
     e = LoggedRequest(TangRequest(datetime(2026, 1, 1, tzinfo=timezone.utc), "10.0.0.5",
                                   "[FD00:0:0::5]:7500", "rec", 200), "d", True)
     assert success_address(e) == "fd00::5"
+
+
+def test_mismatch_is_pure_tristate():
+    assert mismatch(rec(), {"192.168.1.112"}) is True
+    assert mismatch(rec(), {"192.168.1.87"}) is False
+    assert mismatch(rec(flag="flagged"), {"192.168.1.112"}) is False
+    assert mismatch(rec(), None) is None
+
+
+@pytest.mark.parametrize("flag", ["flagged", "fixed_untested"])
+def test_unknown_pi_addresses_leave_existing_flag_on_success(flag):
+    r = apply_success(rec(flag=flag), "d", "192.168.1.112", T2, None)
+    assert r.flag == flag

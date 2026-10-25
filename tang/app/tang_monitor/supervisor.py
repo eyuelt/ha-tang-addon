@@ -29,26 +29,38 @@ class Supervisor:
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
 
-    async def pi_addresses(self) -> set[str] | None:
+    async def network_info(self) -> tuple[set[str] | None, str | None]:
+        """(all Pi addresses, first IPv4 of the primary interface); (None, None) when unknown."""
         if self._token is None:
-            return None
+            return None, None
         try:
             async with self._session.get(f"{self._base}/network/info", headers=self._headers,
                                          timeout=_TIMEOUT) as resp:
                 resp.raise_for_status()
                 body = await resp.json()
             out: set[str] = set()
+            primary: str | None = None
             for iface in body["data"]["interfaces"]:
                 for fam in ("ipv4", "ipv6"):
                     for a in (iface.get(fam) or {}).get("address") or []:
                         ip = canonical_ip(a.split("/", 1)[0])
                         if ip is not None:
                             out.add(ip)
+                if iface.get("primary") and primary is None:
+                    for a in (iface.get("ipv4") or {}).get("address") or []:
+                        ip = canonical_ip(a.split("/", 1)[0])
+                        if ip is not None:
+                            primary = ip
+                            break
         except Exception as e:  # noqa: BLE001 - any failure means "unknown"
             self._fail("network_info", e)
-            return None
+            return None, None
         self._ok("network_info")
-        return out
+        # No addresses at all (e.g. link down) is "unknown", not "the Pi has no address".
+        return (out or None), primary
+
+    async def pi_addresses(self) -> set[str] | None:
+        return (await self.network_info())[0]
 
     async def _post(self, kind: str, path: str, body: dict) -> None:
         if self._token is None:
@@ -65,6 +77,18 @@ class Supervisor:
     async def set_state(self, entity_id: str, state: str, attributes: dict) -> None:
         await self._post("set_state", f"/core/api/states/{entity_id}",
                          {"state": state, "attributes": attributes})
+
+    async def remove_state(self, entity_id: str) -> None:
+        if self._token is None:
+            return
+        try:
+            async with self._session.delete(f"{self._base}/core/api/states/{entity_id}",
+                                            headers=self._headers, timeout=_TIMEOUT) as resp:
+                resp.raise_for_status()
+        except Exception as e:  # noqa: BLE001
+            self._fail("remove_state", e)
+            return
+        self._ok("remove_state")
 
     async def fire_event(self, event_type: str, data: dict) -> None:
         await self._post("fire_event", f"/core/api/events/{event_type}", data)

@@ -16,7 +16,8 @@ LOCAL = frozenset({"127.0.0.1"})
 async def make_client(aiohttp_client, tmp_path, allow=LOCAL):
     s = AppState(tmp_path, Options(["d.lan"], True), KEYS, Namer(lookup=lambda ip: "d.lan"))
     await s.handle_request(TangRequest(T, "1.1.1.1", "192.168.1.87:7500", "rec", 200))
-    s.set_pi_addresses({"192.168.1.112"})
+    for _ in range(3):  # the flag needs 3 consecutive mismatching checks
+        s.set_pi_addresses({"192.168.1.112"})
     return s, await aiohttp_client(make_app(s, allow))
 
 
@@ -31,7 +32,7 @@ async def test_state_json_shape(aiohttp_client, tmp_path):
     r = await c.get("/api/state")
     assert r.status == 200
     j = await r.json()
-    assert set(j) == {"running", "pi_addresses", "address_reserved", "commands_verified",
+    assert set(j) == {"running", "primary_address", "pi_addresses", "address_reserved", "commands_verified",
                       "keys", "requests", "devices", "test_commands"}
     assert set(j["keys"][0]) == {"use", "s256", "s1"}
     assert set(j["requests"][0]) == {"at", "device", "known", "ip", "host", "kind", "status"}
@@ -50,6 +51,23 @@ async def test_forget_200_404(aiohttp_client, tmp_path):
     _, c = await make_client(aiohttp_client, tmp_path)
     assert (await c.post("/api/devices/d.lan/forget")).status == 200
     assert (await c.post("/api/devices/d.lan/forget")).status == 404
+
+
+async def test_forget_calls_on_forget_only_on_success(aiohttp_client, tmp_path):
+    s, c = await make_client(aiohttp_client, tmp_path)
+    forgotten = []
+
+    async def on_forget(device):
+        forgotten.append(device)
+    s.on_forget = on_forget
+    assert (await c.post("/api/devices/d.lan/forget")).status == 200
+    assert (await c.post("/api/devices/d.lan/forget")).status == 404
+    assert forgotten == ["d.lan"]
+
+
+def test_default_ingress_remotes_pinned():
+    from tang_monitor.web import INGRESS_REMOTES
+    assert INGRESS_REMOTES == {"172.30.32.2", "127.0.0.1", "::1"}
 
 
 async def test_index_and_static(aiohttp_client, tmp_path):

@@ -42,6 +42,13 @@ def apply_check(rec: DeviceRecord, pi_addresses: set[str] | None) -> DeviceRecor
     return rec
 
 
+def mismatch(rec: DeviceRecord, pi_addresses: set[str] | None) -> bool | None:
+    """True if a not-yet-flagged device points at an address the Pi lacks; None if unknown."""
+    if pi_addresses is None:
+        return None
+    return rec.flag == "none" and rec.last_ok_address not in pi_addresses
+
+
 def apply_fixed(rec: DeviceRecord) -> DeviceRecord:
     if rec.flag != "flagged":
         raise ValueError(f"device {rec.device!r} is not flagged")

@@ -17,16 +17,21 @@ KEYS = [KeyInfo("a", "signing", "S256A", "S1A"), KeyInfo("b", "exchange", "S256B
 
 
 class FakeSupervisor:
-    def __init__(self, addrs=None, fail=()):
+    def __init__(self, addrs=None, fail=(), primary=None):
         self.addrs = addrs
+        self.primary = primary
+        self.removed: list[str] = []
         self.fail = set(fail)
         self.states: dict[str, tuple[str, dict]] = {}
         self.events: list[tuple[str, dict]] = []
 
-    async def pi_addresses(self):
+    async def network_info(self):
         if "pi_addresses" in self.fail:
             raise RuntimeError("boom")
-        return self.addrs
+        return self.addrs, self.primary
+
+    async def remove_state(self, entity_id):
+        self.removed.append(entity_id)
 
     async def set_state(self, entity_id, state, attributes):
         if "set_state" in self.fail:
@@ -86,11 +91,12 @@ async def health_url(aiohttp_server):
 async def test_refresh_sets_running_addresses_and_publishes(tmp_path, health_url):
     import aiohttp
     url, status = health_url
-    state, sup = make_state(tmp_path), FakeSupervisor(addrs={"192.168.1.87"})
+    state, sup = make_state(tmp_path), FakeSupervisor(addrs={"192.168.1.87", "10.0.0.1"}, primary="192.168.1.87")
     async with aiohttp.ClientSession() as session:
         await main.refresh(state, sup, session, url)
         assert state.tang_running is True
-        assert state.pi_addresses == {"192.168.1.87"}
+        assert state.pi_addresses == {"192.168.1.87", "10.0.0.1"}
+        assert state.primary_address() == "192.168.1.87"
         assert sup.states["binary_sensor.tang_running"][0] == "on"
         status["code"] = 500
         await main.refresh(state, sup, session, url)
