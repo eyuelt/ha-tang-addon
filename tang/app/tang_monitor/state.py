@@ -1,5 +1,6 @@
 """Application state tying keys, request log, device store and address checks together."""
 import ipaddress
+from dataclasses import replace
 from pathlib import Path
 from collections.abc import Awaitable, Callable
 from typing import Literal
@@ -9,6 +10,7 @@ from .address_check import (address_ok, apply_check, apply_fixed, apply_success,
                             mismatch, success_address)
 from .devices import DeviceStore
 from .keys import KeyInfo
+from .known import KnownDevices
 from .naming import Namer, is_known_request
 from .options import Options
 from .records import LoggedRequest, RequestLog, TangRequest
@@ -31,11 +33,15 @@ class AppState:
         self._mismatches: dict[str, int] = {}  # in memory only; a restart resets the debounce
         self.log = RequestLog(data_dir / "requests.json")
         self.store = DeviceStore(data_dir / "devices.json")
+        self.known = KnownDevices(data_dir / "known.json")
+
+    def is_known(self, name: str | None, ip: str) -> bool:
+        return is_known_request(name, ip, self.options.known_devices) or self.known.matches(name, ip)
 
     async def handle_request(self, req: TangRequest) -> LoggedRequest:
         name = await self.namer.name_for(req.ip)
         device = name or req.ip
-        entry = LoggedRequest(req, device, is_known_request(name, req.ip, self.options.known_devices))
+        entry = LoggedRequest(req, device, self.is_known(name, req.ip))
         self.log.append(entry)
         addr = success_address(entry)
         if addr is not None:
@@ -70,9 +76,32 @@ class AppState:
             return "not_flagged"
         return "ok"
 
-    def forget(self, device: str) -> bool:
+    def mark_known(self, device: str) -> Literal["ok", "not_found", "already_known"]:
+        entries = [e for e in self.log.recent() if e.device == device]  # newest first
+        if not entries:
+            return "not_found"
+        if self._device_known(device):
+            return "already_known"
+        self.known.add(device)
+        for e in entries:
+            as_known = replace(e, known=True)
+            addr = success_address(as_known)
+            if addr is not None:
+                self.store.put(apply_success(self.store.get(device), device, addr, e.request.at,
+                                             self.pi_addresses))
+                break
+        return "ok"
+
+    def _device_known(self, device: str) -> bool:
+        """Known status of a device id (a resolved name, else an IP)."""
+        return self.is_known(device, device)
+
+    def forget(self, device: str) -> dict:
         self._mismatches.pop(device, None)
-        return self.store.forget(device)
+        removed_record = self.store.forget(device)
+        removed_known = self.known.remove(device)
+        return {"forgot": removed_record or removed_known,
+                "still_known_via_options": is_known_request(device, device, self.options.known_devices)}
 
     async def notify_forgotten(self, device: str) -> None:
         if self.on_forget is not None:
@@ -91,6 +120,16 @@ class AppState:
             except ValueError:
                 continue
         return addrs[0]
+
+    def _known_devices(self) -> list[dict]:
+        ids = self.known.ids()
+        out = [{"device": d, "source": "dashboard"} for d in ids]
+        listed = set(ids)
+        for d in self.options.known_devices:
+            if d not in listed:
+                listed.add(d)
+                out.append({"device": d, "source": "options"})
+        return out
 
     def _has_signing(self) -> bool:
         return any(k.use == "signing" for k in self.keys)
@@ -122,9 +161,10 @@ class AppState:
             "address_reserved": self.options.address_reserved,
             "commands_verified": verified,
             "keys": [{"use": k.use, "s256": k.s256, "s1": k.s1} for k in self.keys],
-            "requests": [{"at": e.request.at.isoformat(), "device": e.device, "known": e.known,
+            "requests": [{"at": e.request.at.isoformat(), "device": e.device, "known": self._device_known(e.device),
                           "ip": e.request.ip, "host": e.request.host, "kind": e.request.kind,
                           "status": e.request.status} for e in self.log.recent()],
             "devices": devices,
+            "known_devices": self._known_devices(),
             "test_commands": test_commands,
         }

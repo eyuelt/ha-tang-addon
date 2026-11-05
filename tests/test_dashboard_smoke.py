@@ -56,3 +56,5 @@ def test_demo_dashboard_renders_real_dom(demo_url, tmp_path):
     assert "How to fix" in out
     assert "Reserve 192.168.1.112" in out
     assert "&lt;b&gt;stranger" in out  # untrusted name escaped, not injected as markup
+    assert ">Mark as known<" in out  # on the unknown row
+    assert "desktop.lan" in out and "known, not seen yet" in out  # known device with no record

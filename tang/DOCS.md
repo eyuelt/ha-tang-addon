@@ -14,7 +14,8 @@ Keep port 7500 reachable only from your home network. Do not forward it from the
 
 1. Reserve the Pi's address in your router first, as described above. Then turn on
    **Address reserved** in this add-on's settings.
-2. Add the device names to `known_devices`, as your router reports them (for example `server.lan`).
+2. Open the Tang panel, find the device's request in the history, and click **Mark as known**. No restart is needed.
+   (The **Known devices** option still works for listing devices ahead of time; it takes effect after a restart.)
 3. Bind a device. On the device, run:
 
    ```sh
@@ -35,7 +36,9 @@ Keep port 7500 reachable only from your home network. Do not forward it from the
 
 ## Options
 
-- **`known_devices`**: names of the devices you bound. Requests from other devices are marked unknown.
+- **`known_devices`**: optional. Names of the devices you bound, as your router reports them (for example
+  `server.lan`). Takes effect after a restart. You can also mark devices known from the dashboard. Requests from
+  other devices are marked unknown.
 - **`address_reserved`**: turn on once the Pi's address is reserved. This hides the reservation reminder.
 
 ## Home Assistant entities

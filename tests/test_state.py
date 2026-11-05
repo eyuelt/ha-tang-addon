@@ -73,8 +73,8 @@ async def test_mark_fixed_paths(tmp_path):
 
 async def test_forget(tmp_path):
     s = await flagged_state(tmp_path)
-    assert s.forget("server.lan") is True
-    assert s.forget("server.lan") is False
+    assert s.forget("server.lan") == {"forgot": True, "still_known_via_options": True}
+    assert s.forget("server.lan") == {"forgot": False, "still_known_via_options": True}
     assert s.snapshot()["devices"] == []
 
 
@@ -198,3 +198,80 @@ async def test_ip_literal_in_known_devices(tmp_path):
     entry = await s.handle_request(req(ip="10.0.0.9"))
     assert entry.known and entry.device == "10.0.0.9"
     assert s.snapshot()["devices"][0]["device"] == "10.0.0.9"
+
+
+async def test_mark_known_makes_new_requests_known(tmp_path):
+    s = make_state(tmp_path)
+    assert not (await s.handle_request(req(ip="192.168.1.66"))).known
+    assert s.mark_known("stranger.lan") == "ok"
+    assert s.is_known("stranger.lan", "192.168.1.66")
+    assert (await s.handle_request(req(ip="192.168.1.66"))).known
+
+
+async def test_mark_known_updates_past_rows_but_not_log(tmp_path):
+    s = make_state(tmp_path)
+    await s.handle_request(req(ip="192.168.1.66"))
+    assert s.snapshot()["requests"][0]["known"] is False
+    s.mark_known("stranger.lan")
+    assert s.snapshot()["requests"][0]["known"] is True
+    assert s.log.recent()[0].known is False  # stored value is unchanged
+
+
+async def test_mark_known_creates_record_from_newest_success(tmp_path):
+    s = make_state(tmp_path)
+    old = TangRequest(T, "192.168.1.66", "192.168.1.80:7500", "rec", 200)
+    new = TangRequest(T.replace(hour=18), "192.168.1.66", "192.168.1.87:7500", "adv", 200)
+    err = TangRequest(T.replace(hour=19), "192.168.1.66", "192.168.1.90:7500", "rec", 404)
+    for r in (old, new, err):
+        await s.handle_request(r)
+    assert s.snapshot()["devices"] == []
+    assert s.mark_known("stranger.lan") == "ok"
+    rec = s.store.get("stranger.lan")
+    assert rec.last_ok_address == "192.168.1.87" and rec.last_ok_at == new.at
+
+
+async def test_mark_known_without_success_creates_no_record(tmp_path):
+    s = make_state(tmp_path)
+    await s.handle_request(req(ip="192.168.1.66", status=404))
+    assert s.mark_known("stranger.lan") == "ok"
+    assert s.store.all() == []
+
+
+async def test_mark_known_not_found_and_already_known(tmp_path):
+    s = make_state(tmp_path)
+    await s.handle_request(req(ip="192.168.1.66"))
+    await s.handle_request(req())
+    assert s.mark_known("nope.lan") == "not_found"
+    assert s.mark_known("server.lan") == "already_known"  # via the option
+    assert s.mark_known("stranger.lan") == "ok"
+    assert s.mark_known("stranger.lan") == "already_known"  # via the list
+
+
+async def test_forget_removes_from_list_and_record(tmp_path):
+    s = make_state(tmp_path)
+    await s.handle_request(req(ip="192.168.1.66"))
+    s.mark_known("stranger.lan")
+    assert s.store.get("stranger.lan") is not None
+    assert s.forget("stranger.lan") == {"forgot": True, "still_known_via_options": False}
+    assert s.store.get("stranger.lan") is None
+    assert not s.is_known("stranger.lan", "192.168.1.66")
+
+
+async def test_forget_list_only_entry(tmp_path):
+    s = make_state(tmp_path)
+    await s.handle_request(req(ip="192.168.1.66", status=404))
+    s.mark_known("stranger.lan")
+    assert s.forget("stranger.lan")["forgot"] is True
+
+
+async def test_snapshot_known_devices(tmp_path):
+    s = make_state(tmp_path)
+    await s.handle_request(req(ip="192.168.1.66", status=404))
+    s.mark_known("stranger.lan")
+    assert s.snapshot()["known_devices"] == [
+        {"device": "stranger.lan", "source": "dashboard"},
+        {"device": "server.lan", "source": "options"}]
+    # option entries already in the dashboard list are not duplicated
+    s.known.add("server.lan")
+    assert [k["device"] for k in s.snapshot()["known_devices"]] == ["stranger.lan", "server.lan"]
+    assert s.snapshot()["known_devices"][1]["source"] == "dashboard"

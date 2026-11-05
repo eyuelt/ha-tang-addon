@@ -33,7 +33,7 @@ async def test_state_json_shape(aiohttp_client, tmp_path):
     assert r.status == 200
     j = await r.json()
     assert set(j) == {"running", "primary_address", "pi_addresses", "address_reserved", "commands_verified",
-                      "keys", "requests", "devices", "test_commands"}
+                      "keys", "requests", "devices", "known_devices", "test_commands"}
     assert set(j["keys"][0]) == {"use", "s256", "s1"}
     assert set(j["requests"][0]) == {"at", "device", "known", "ip", "host", "kind", "status"}
     assert set(j["devices"][0]) == {"device", "last_ok_address", "last_ok_at", "flag",
@@ -49,8 +49,34 @@ async def test_fixed_404_409_200(aiohttp_client, tmp_path):
 
 async def test_forget_200_404(aiohttp_client, tmp_path):
     _, c = await make_client(aiohttp_client, tmp_path)
-    assert (await c.post("/api/devices/d.lan/forget")).status == 200
+    r = await c.post("/api/devices/d.lan/forget")
+    assert r.status == 200
+    assert await r.json() == {"forgot": True, "still_known_via_options": True}
     assert (await c.post("/api/devices/d.lan/forget")).status == 404
+
+
+async def test_known_200_404_409(aiohttp_client, tmp_path):
+    s, c = await make_client(aiohttp_client, tmp_path)
+    s.namer._cache["1.1.1.2"] = (s.namer._now(), "other.lan")
+    await s.handle_request(TangRequest(T, "1.1.1.2", "192.168.1.87:7500", "rec", 200))
+    assert (await c.post("/api/devices/nope/known")).status == 404
+    assert (await c.post("/api/devices/d.lan/known")).status == 409  # via the option
+    assert (await c.post("/api/devices/other.lan/known")).status == 200
+    assert s.known.ids() == ["other.lan"]
+    assert (await c.post("/api/devices/other.lan/known")).status == 409  # via the list
+
+
+async def test_forget_list_only_device_skips_on_forget(aiohttp_client, tmp_path):
+    s, c = await make_client(aiohttp_client, tmp_path)
+    forgotten = []
+
+    async def on_forget(device):
+        forgotten.append(device)
+    s.on_forget = on_forget
+    s.known.add("x.lan")
+    r = await c.post("/api/devices/x.lan/forget")
+    assert r.status == 200 and await r.json() == {"forgot": True, "still_known_via_options": False}
+    assert forgotten == []
 
 
 async def test_forget_calls_on_forget_only_on_success(aiohttp_client, tmp_path):

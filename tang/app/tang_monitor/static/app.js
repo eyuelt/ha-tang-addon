@@ -4,6 +4,8 @@ const POLL_MS = 10000;
 const openDetails = new Set();
 let lastState = null;
 let lastText = null;
+let pendingForget = null;  // device id awaiting the inline "Forget? Yes / Cancel" confirmation
+let forgetNote = null;
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -107,6 +109,23 @@ async function post(path) {
   refresh();
 }
 
+async function forgetDevice(device) {
+  pendingForget = null;
+  try {
+    const r = await fetch("api/devices/" + encodeURIComponent(device) + "/forget", { method: "POST" });
+    if (r.ok) {
+      const j = await r.json();
+      forgetNote = j.still_known_via_options ? device : null;
+    } else if (r.status !== 404) {
+      alert("Request failed: " + r.status);
+    }
+  } catch (e) {
+    alert("Request failed: " + e);
+  }
+  lastText = null;
+  refresh();
+}
+
 function renderStatus(s) {
   const last = s.requests.find(r => r.kind === "rec" && r.status === 200);
   return h("div", { class: "card status" },
@@ -142,7 +161,9 @@ function renderAlerts(s) {
 function renderHistory(s) {
   const rows = s.requests.map(r => h("tr", { class: r.known ? "" : "unknown" },
     h("td", {}, fmtTime(r.at)),
-    h("td", {}, r.device, !r.known && h("span", { class: "tag" }, " ⚠ unknown")),
+    h("td", {}, r.device, !r.known && h("span", { class: "tag" }, " ⚠ unknown"),
+      !r.known && h("button", { type: "button", class: "small",
+        onclick: () => post("api/devices/" + encodeURIComponent(r.device) + "/known") }, "Mark as known")),
     h("td", { class: "mono" }, r.ip),
     h("td", { class: result(r) === "error" ? "err" : "" }, result(r))));
   return [h("h2", {}, "History"), h("div", { class: "scroll" }, h("table", {},
@@ -156,16 +177,32 @@ function renderKeys(s) {
       : h("span", { class: "muted" }, "No keys."))];
 }
 
+function forgetControl(device) {
+  if (pendingForget === device) {
+    return h("span", {}, "Forget? ",
+      h("button", { type: "button", onclick: () => forgetDevice(device) }, "Yes"), " ",
+      h("button", { type: "button", onclick: () => { pendingForget = null; render(lastState); } }, "Cancel"));
+  }
+  return h("button", { type: "button", onclick: () => { pendingForget = device; render(lastState); } }, "Forget");
+}
+
 function renderDevices(s) {
-  const body = s.devices.length ? s.devices.map(d => h("div", { class: "cmd" },
+  const rows = s.devices.map(d => ({ device: d.device, rec: d }));
+  const seen = new Set(rows.map(r => r.device));
+  for (const k of s.known_devices || []) {
+    if (!seen.has(k.device)) { seen.add(k.device); rows.push({ device: k.device, rec: null }); }
+  }
+  const body = rows.length ? rows.map(({ device, rec }) => h("div", { class: "cmd" },
     h("div", { style: "flex:1" },
-      h("strong", {}, d.device), " via ", h("code", {}, d.last_ok_address), ", " + fmtTime(d.last_ok_at) +
-      ", " + (d.flag === "none" ? "ok" : d.flag === "flagged" ? "needs fixing" : "fixed, untested")),
-    h("button", { type: "button", onclick: () => {
-      if (confirm("Forget " + d.device + "?")) post("api/devices/" + encodeURIComponent(d.device) + "/forget");
-    } }, "Forget")))
+      h("strong", {}, device),
+      rec ? [" via ", h("code", {}, rec.last_ok_address), ", " + fmtTime(rec.last_ok_at) +
+        ", " + (rec.flag === "none" ? "ok" : rec.flag === "flagged" ? "needs fixing" : "fixed, untested")]
+        : ", known, not seen yet"),
+    forgetControl(device)))
     : h("span", { class: "muted" }, "No devices tracked yet.");
-  return [h("h2", {}, "Devices"), h("div", { class: "card" }, body)];
+  const note = forgetNote && h("p", { class: "muted" }, forgetNote +
+    " is also listed in this app's Configuration (Known devices). Remove it there to stop treating it as known.");
+  return [h("h2", {}, "Devices"), h("div", { class: "card" }, body, note)];
 }
 
 function renderTestCommands(s) {

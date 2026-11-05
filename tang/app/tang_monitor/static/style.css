@@ -42,3 +42,4 @@ tr.unknown td { background: var(--unk-bg); }
 .err { color: var(--bad-fg); }
 code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }
 .scroll { overflow-x: auto; }
+button.small { padding: 0 6px; font-size: 0.85em; margin-left: 6px; }

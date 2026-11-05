@@ -36,9 +36,21 @@ def make_app(state, allow_remotes: frozenset[str] = INGRESS_REMOTES) -> web.Appl
         return web.json_response({"ok": True})
 
     async def forget(request):
-        if not state.forget(request.match_info["device"]):
+        device = request.match_info["device"]
+        had_record = state.store.get(device) is not None
+        result = state.forget(device)
+        if not result["forgot"]:
             raise web.HTTPNotFound()
-        await state.notify_forgotten(request.match_info["device"])
+        if had_record:
+            await state.notify_forgotten(device)
+        return web.json_response(result)
+
+    async def known(request):
+        result = state.mark_known(request.match_info["device"])
+        if result == "not_found":
+            raise web.HTTPNotFound()
+        if result == "already_known":
+            raise web.HTTPConflict()
         return web.json_response({"ok": True})
 
     app = web.Application(middlewares=[only_ingress])
@@ -48,6 +60,7 @@ def make_app(state, allow_remotes: frozenset[str] = INGRESS_REMOTES) -> web.Appl
         web.get("/api/state", api_state),
         web.post("/api/devices/{device}/fixed", fixed),
         web.post("/api/devices/{device}/forget", forget),
+        web.post("/api/devices/{device}/known", known),
     ])
     return app
 
@@ -69,7 +82,7 @@ def _demo_state():
              "192.168.1.66": "<b>stranger</b>.lan"}
     keys = [KeyInfo("a", "signing", "SIGNFP256xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "s1"),
             KeyInfo("b", "exchange", "EXCHFP256xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "s1b")]
-    s = AppState(Path(tempfile.mkdtemp()), Options(["server.lan", "laptop.lan"], False),
+    s = AppState(Path(tempfile.mkdtemp()), Options(["server.lan", "laptop.lan", "desktop.lan"], False),
                  keys, Namer(lookup=names.get))
     now = datetime.now().astimezone()
     sample = [

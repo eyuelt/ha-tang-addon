@@ -1,5 +1,5 @@
 name: Tang
-version: "0.1.0"
+version: "0.1.1"
 slug: tang
 description: Tang server for network-bound LUKS disk unlock (Clevis), with a request log and dashboard
 url: https://github.com/eyuelt/ha-tang-addon
