@@ -18,4 +18,4 @@ def load_options(path: Path = Path("/data/options.json")) -> Options:
     known = raw.get("known_devices", [])
     if not isinstance(known, list):
         known = []
-    return Options([str(k) for k in known], bool(raw.get("address_reserved", False)))
+    return Options([str(k) for k in known if str(k).strip()], bool(raw.get("address_reserved", False)))

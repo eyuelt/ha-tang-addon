@@ -303,3 +303,20 @@ async def test_option_case_variant_not_duplicated_in_known_devices(tmp_path):
     assert [k["device"] for k in s.snapshot()["known_devices"]] == ["server.lan", "10.0.0.5"]
     s.known.add("SERVER.lan")
     assert [k["device"] for k in s.snapshot()["known_devices"]] == ["server.lan", "10.0.0.5"]
+
+
+async def test_mark_known_ok_when_only_some_rows_are_known(tmp_path):
+    names = {"10.0.0.9": "box.lan", "10.0.0.20": "box.lan"}
+    s = AppState(tmp_path, Options(["10.0.0.9"], True), KEYS, Namer(lookup=names.get))
+    await s.handle_request(req(ip="10.0.0.9"))
+    await s.handle_request(req(ip="10.0.0.20"))
+    assert [r["known"] for r in s.snapshot()["requests"]] == [False, True]
+    assert s.mark_known("box.lan") == "ok"
+    assert all(r["known"] for r in s.snapshot()["requests"])
+    assert s.mark_known("box.lan") == "already_known"
+
+
+def test_load_options_ignores_blank_entries(tmp_path):
+    p = tmp_path / "o.json"
+    p.write_text('{"known_devices": ["x", "", "  "]}')
+    assert load_options(p).known_devices == ["x"]

@@ -84,7 +84,7 @@ class AppState:
         entries = [e for e in self.log.recent() if e.device == device]  # newest first
         if not entries:
             return "not_found"
-        if any(self.is_known(self._name_of(e), e.request.ip) for e in entries):
+        if all(self.is_known(self._name_of(e), e.request.ip) for e in entries):
             return "already_known"
         self.known.add(device)
         for e in entries:
