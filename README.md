@@ -6,8 +6,7 @@ every request, shows a dashboard in the Home Assistant sidebar, and publishes en
 
 ## Install
 
-1. In Home Assistant, go to Settings -> Apps and select Install app. (Before Home Assistant 2026.2, apps were
-   called add-ons: Settings -> Add-ons -> Add-on Store.)
+1. In Home Assistant, go to Settings -> Apps and select Install app.
 2. Open the menu (three dots, top right) -> Repositories, paste this repository's URL and select Add:
    `https://github.com/eyuelt/ha-tang-addon`
 3. Install "Tang" from the store and start it.
