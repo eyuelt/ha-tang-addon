@@ -116,6 +116,7 @@ async function forgetDevice(device) {
     if (r.ok) {
       const j = await r.json();
       forgetNote = j.still_known_via_options ? device : null;
+      if (!j.forgot) lastText = null;
     } else if (r.status !== 404) {
       alert("Request failed: " + r.status);
     }
@@ -188,9 +189,10 @@ function forgetControl(device) {
 
 function renderDevices(s) {
   const rows = s.devices.map(d => ({ device: d.device, rec: d }));
-  const seen = new Set(rows.map(r => r.device));
+  const norm = d => d.trim().toLowerCase().replace(/\.+$/, "");
+  const seen = new Set(rows.map(r => norm(r.device)));
   for (const k of s.known_devices || []) {
-    if (!seen.has(k.device)) { seen.add(k.device); rows.push({ device: k.device, rec: null }); }
+    if (!seen.has(norm(k.device))) { seen.add(norm(k.device)); rows.push({ device: k.device, rec: null }); }
   }
   const body = rows.length ? rows.map(({ device, rec }) => h("div", { class: "cmd" },
     h("div", { style: "flex:1" },

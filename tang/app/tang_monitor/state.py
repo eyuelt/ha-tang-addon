@@ -6,12 +6,12 @@ from collections.abc import Awaitable, Callable
 from typing import Literal
 
 from . import commands
-from .address_check import (address_ok, apply_check, apply_fixed, apply_success,
+from .address_check import (canonical_ip, address_ok, apply_check, apply_fixed, apply_success,
                             mismatch, success_address)
 from .devices import DeviceStore
 from .keys import KeyInfo
 from .known import KnownDevices
-from .naming import Namer, is_known_request
+from .naming import Namer, is_known_request, normalize_id
 from .options import Options
 from .records import LoggedRequest, RequestLog, TangRequest
 
@@ -34,6 +34,10 @@ class AppState:
         self.log = RequestLog(data_dir / "requests.json")
         self.store = DeviceStore(data_dir / "devices.json")
         self.known = KnownDevices(data_dir / "known.json")
+
+    @staticmethod
+    def _name_of(entry: LoggedRequest) -> str | None:
+        return entry.device if entry.device != entry.request.ip else None
 
     def is_known(self, name: str | None, ip: str) -> bool:
         return is_known_request(name, ip, self.options.known_devices) or self.known.matches(name, ip)
@@ -80,7 +84,7 @@ class AppState:
         entries = [e for e in self.log.recent() if e.device == device]  # newest first
         if not entries:
             return "not_found"
-        if self._device_known(device):
+        if any(self.is_known(self._name_of(e), e.request.ip) for e in entries):
             return "already_known"
         self.known.add(device)
         for e in entries:
@@ -92,16 +96,17 @@ class AppState:
                 break
         return "ok"
 
-    def _device_known(self, device: str) -> bool:
-        """Known status of a device id (a resolved name, else an IP)."""
-        return self.is_known(device, device)
-
     def forget(self, device: str) -> dict:
         self._mismatches.pop(device, None)
         removed_record = self.store.forget(device)
         removed_known = self.known.remove(device)
         return {"forgot": removed_record or removed_known,
-                "still_known_via_options": is_known_request(device, device, self.options.known_devices)}
+                "still_known_via_options": self._known_via_options(device)}
+
+    def _known_via_options(self, device: str) -> bool:
+        is_ip = canonical_ip(device) is not None
+        return is_known_request(None if is_ip else device, device if is_ip else "",
+                                self.options.known_devices)
 
     async def notify_forgotten(self, device: str) -> None:
         if self.on_forget is not None:
@@ -125,7 +130,7 @@ class AppState:
         ids = self.known.ids()
         out = [{"device": d, "source": "dashboard"} for d in ids]
         listed = set(ids)
-        for d in self.options.known_devices:
+        for d in map(normalize_id, self.options.known_devices):
             if d not in listed:
                 listed.add(d)
                 out.append({"device": d, "source": "options"})
@@ -161,7 +166,7 @@ class AppState:
             "address_reserved": self.options.address_reserved,
             "commands_verified": verified,
             "keys": [{"use": k.use, "s256": k.s256, "s1": k.s1} for k in self.keys],
-            "requests": [{"at": e.request.at.isoformat(), "device": e.device, "known": self._device_known(e.device),
+            "requests": [{"at": e.request.at.isoformat(), "device": e.device, "known": self.is_known(self._name_of(e), e.request.ip),
                           "ip": e.request.ip, "host": e.request.host, "kind": e.request.kind,
                           "status": e.request.status} for e in self.log.recent()],
             "devices": devices,

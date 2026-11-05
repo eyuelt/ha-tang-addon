@@ -39,7 +39,7 @@ def make_app(state, allow_remotes: frozenset[str] = INGRESS_REMOTES) -> web.Appl
         device = request.match_info["device"]
         had_record = state.store.get(device) is not None
         result = state.forget(device)
-        if not result["forgot"]:
+        if not result["forgot"] and not result["still_known_via_options"]:
             raise web.HTTPNotFound()
         if had_record:
             await state.notify_forgotten(device)

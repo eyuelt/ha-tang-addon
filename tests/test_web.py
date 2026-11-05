@@ -52,7 +52,11 @@ async def test_forget_200_404(aiohttp_client, tmp_path):
     r = await c.post("/api/devices/d.lan/forget")
     assert r.status == 200
     assert await r.json() == {"forgot": True, "still_known_via_options": True}
-    assert (await c.post("/api/devices/d.lan/forget")).status == 404
+    # nothing left to remove, but the option still lists it: 200 so the UI can show the note
+    r = await c.post("/api/devices/d.lan/forget")
+    assert r.status == 200
+    assert await r.json() == {"forgot": False, "still_known_via_options": True}
+    assert (await c.post("/api/devices/nope.lan/forget")).status == 404
 
 
 async def test_known_200_404_409(aiohttp_client, tmp_path):
@@ -87,7 +91,8 @@ async def test_forget_calls_on_forget_only_on_success(aiohttp_client, tmp_path):
         forgotten.append(device)
     s.on_forget = on_forget
     assert (await c.post("/api/devices/d.lan/forget")).status == 200
-    assert (await c.post("/api/devices/d.lan/forget")).status == 404
+    assert (await c.post("/api/devices/d.lan/forget")).status == 200  # option-only: no removal
+    assert (await c.post("/api/devices/nope.lan/forget")).status == 404
     assert forgotten == ["d.lan"]
 
 

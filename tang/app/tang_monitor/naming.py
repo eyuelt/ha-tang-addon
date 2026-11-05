@@ -48,6 +48,11 @@ class Namer:
         return name
 
 
+def normalize_id(device: str) -> str:
+    """Canonical form of a device id: an IP literal in canonical form, else a normalized name."""
+    return canonical_ip(device.strip()) or _normalize(device.strip())
+
+
 def is_known(name: str | None, known: list[str]) -> bool:
     if not name:
         return False

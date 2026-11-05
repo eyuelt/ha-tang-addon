@@ -27,7 +27,7 @@ def test_matches_ip_canonical(tmp_path):
     assert k.matches(None, "fe80::1")
     assert not k.matches(None, "fe80::2")
     k.add("10.0.0.7")
-    assert k.matches("other.lan", "10.0.0.7")
+    assert k.matches(None, "10.0.0.7")
 
 
 def test_persists_across_instances(tmp_path):
@@ -53,3 +53,24 @@ def test_wrong_shape_quarantined(tmp_path):
         assert KnownDevices(p).ids() == []
         assert (tmp_path / f"k{i}.json.corrupt").exists()
         assert not p.exists()
+
+
+def test_ip_id_does_not_match_when_name_resolved(tmp_path):
+    k = KnownDevices(tmp_path / "known.json")
+    k.add("10.0.0.7")
+    assert not k.matches("other.lan", "10.0.0.7")
+
+
+def test_name_id_does_not_match_by_ip_alone(tmp_path):
+    k = KnownDevices(tmp_path / "known.json")
+    k.add("other.lan")
+    assert not k.matches(None, "10.0.0.7")
+
+
+def test_add_remove_normalize(tmp_path):
+    k = KnownDevices(tmp_path / "known.json")
+    assert k.add("Server.LAN.") is True
+    assert k.add("server.lan") is False
+    assert k.ids() == ["server.lan"]
+    assert k.remove("SERVER.lan.") is True
+    assert k.ids() == []

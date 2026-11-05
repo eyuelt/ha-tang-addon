@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -275,3 +275,31 @@ async def test_snapshot_known_devices(tmp_path):
     s.known.add("server.lan")
     assert [k["device"] for k in s.snapshot()["known_devices"]] == ["stranger.lan", "server.lan"]
     assert s.snapshot()["known_devices"][1]["source"] == "dashboard"
+
+
+async def test_ip_option_with_resolved_name_is_known_everywhere(tmp_path):
+    names = {"10.0.0.9": "box.lan"}
+    s = AppState(tmp_path, Options(["10.0.0.9"], True), KEYS, Namer(lookup=names.get))
+    entry = await s.handle_request(req(ip="10.0.0.9"))
+    assert entry.known
+    assert s.snapshot()["requests"][0]["known"] is True
+    assert s.mark_known("box.lan") == "already_known"
+
+
+async def test_dashboard_ip_id_ignored_once_name_resolves(tmp_path):
+    names = {}
+    s = AppState(tmp_path, Options([], True), KEYS, Namer(lookup=lambda ip: names.get(ip), ttl=timedelta(0)))
+    await s.handle_request(req(ip="10.0.0.7"))
+    assert s.mark_known("10.0.0.7") == "ok"
+    names["10.0.0.7"] = "other.lan"
+    entry = await s.handle_request(req(ip="10.0.0.7"))
+    assert not entry.known
+    assert s.snapshot()["requests"][0]["known"] is False
+
+
+async def test_option_case_variant_not_duplicated_in_known_devices(tmp_path):
+    s = AppState(tmp_path, Options(["Server.LAN", "10.0.0.5"], True), KEYS, Namer(lookup=NAMES.get))
+    await s.handle_request(req())
+    assert [k["device"] for k in s.snapshot()["known_devices"]] == ["server.lan", "10.0.0.5"]
+    s.known.add("SERVER.lan")
+    assert [k["device"] for k in s.snapshot()["known_devices"]] == ["server.lan", "10.0.0.5"]

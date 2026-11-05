@@ -2,17 +2,18 @@
 from pathlib import Path
 
 from . import jsonfile
-from .address_check import canonical_ip
-from .naming import is_known
+from .naming import normalize_id
 
 
 class KnownDevices:
+    """Device ids (a resolved name, else an IP), stored in normalized form."""
+
     def __init__(self, path: Path):
         self._path = path
         self._ids: list[str] = []
         raw = jsonfile.load(path, [])
         if isinstance(raw, list) and all(isinstance(x, str) for x in raw):
-            self._ids = list(dict.fromkeys(raw))
+            self._ids = list(dict.fromkeys(normalize_id(x) for x in raw))
         else:
             jsonfile.quarantine(path)
 
@@ -20,6 +21,7 @@ class KnownDevices:
         return list(self._ids)
 
     def add(self, device: str) -> bool:
+        device = normalize_id(device)
         if device in self._ids:
             return False
         self._ids.append(device)
@@ -27,6 +29,7 @@ class KnownDevices:
         return True
 
     def remove(self, device: str) -> bool:
+        device = normalize_id(device)
         if device not in self._ids:
             return False
         self._ids.remove(device)
@@ -34,7 +37,5 @@ class KnownDevices:
         return True
 
     def matches(self, name: str | None, ip: str) -> bool:
-        if is_known(name, self._ids):
-            return True
-        cip = canonical_ip(ip)
-        return cip is not None and cip in {canonical_ip(i) for i in self._ids}
+        """Match the request's device id: the resolved name if any, else the IP."""
+        return normalize_id(name or ip) in self._ids
