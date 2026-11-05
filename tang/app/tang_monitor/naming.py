@@ -11,11 +11,18 @@ def _normalize(name: str) -> str:
     return name.lower().rstrip(".")
 
 
+# h_errno values that mean "this address has no name" (resolver.h): a real answer, safe to cache.
+# Anything else (TRY_AGAIN, NO_RECOVERY, gaierror, timeouts) is raised so Namer retries next time.
+_NO_NAME = {1, 4}  # HOST_NOT_FOUND, NO_DATA
+
+
 def reverse_lookup(ip: str) -> str | None:
     try:
         return _normalize(socket.gethostbyaddr(ip)[0])
-    except OSError:
-        return None
+    except socket.herror as e:
+        if e.errno in _NO_NAME:
+            return None
+        raise
 
 
 class Namer:

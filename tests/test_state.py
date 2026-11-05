@@ -125,6 +125,20 @@ def flag_of(s):
     return s.snapshot()["devices"][0]["flag"]
 
 
+def address_ok_of(s):
+    return s.snapshot()["devices"][0]["address_ok"]
+
+
+async def test_address_ok_stays_on_until_the_flag_is_set(tmp_path):
+    s = make_state(tmp_path)
+    await s.handle_request(req())
+    s.set_pi_addresses({"192.168.1.112"})
+    s.set_pi_addresses({"192.168.1.112"})
+    assert address_ok_of(s) is True
+    s.set_pi_addresses({"192.168.1.112"})
+    assert address_ok_of(s) is False
+
+
 async def test_flag_needs_three_consecutive_mismatching_checks(tmp_path):
     s = make_state(tmp_path)
     await s.handle_request(req())

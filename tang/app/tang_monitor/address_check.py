@@ -58,4 +58,5 @@ def apply_fixed(rec: DeviceRecord) -> DeviceRecord:
 def address_ok(rec: DeviceRecord, pi_addresses: set[str] | None) -> bool | None:
     if pi_addresses is None:
         return None
-    return rec.flag == "none" and rec.last_ok_address in pi_addresses
+    # The flag is the debounced signal: a mismatch only counts once AppState has flagged it.
+    return rec.flag == "none"

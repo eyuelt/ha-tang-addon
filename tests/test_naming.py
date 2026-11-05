@@ -1,7 +1,42 @@
+import socket
 import threading
 import time
 
-from tang_monitor.naming import Namer, is_known, is_known_request
+import pytest
+
+from tang_monitor.naming import Namer, is_known, is_known_request, reverse_lookup
+
+
+@pytest.mark.parametrize("errno", [1, 4])  # HOST_NOT_FOUND, NO_DATA
+def test_reverse_lookup_no_name_is_a_real_none(monkeypatch, errno):
+    def fail(ip):
+        raise socket.herror(errno, "no name")
+    monkeypatch.setattr(socket, "gethostbyaddr", fail)
+    assert reverse_lookup("10.0.0.5") is None
+
+
+@pytest.mark.parametrize("exc", [socket.herror(2, "try again"), socket.gaierror(-3, "temporary failure"),
+                                 TimeoutError()])
+def test_reverse_lookup_transient_failure_raises(monkeypatch, exc):
+    def fail(ip):
+        raise exc
+    monkeypatch.setattr(socket, "gethostbyaddr", fail)
+    with pytest.raises(OSError):
+        reverse_lookup("10.0.0.5")
+
+
+async def test_transient_failure_through_namer_is_retried(monkeypatch):
+    calls = []
+
+    def flaky(ip):
+        calls.append(ip)
+        if len(calls) == 1:
+            raise socket.herror(2, "try again")
+        return ("pi.lan", [], [ip])
+    monkeypatch.setattr(socket, "gethostbyaddr", flaky)
+    n = Namer()
+    assert await n.name_for("10.0.0.5") is None
+    assert await n.name_for("10.0.0.5") == "pi.lan"
 
 
 async def test_strips_dot_lowercases():

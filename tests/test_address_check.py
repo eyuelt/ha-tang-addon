@@ -56,8 +56,13 @@ def test_ipv6_and_multiple_pi_addresses_match_any():
     pis = {"192.168.1.87", "fd00::5"}
     assert apply_check(rec("fd00::5"), pis).flag == "none"
     assert address_ok(rec("fd00::5"), pis) is True
-    assert address_ok(rec("fd00::6"), pis) is False
     assert address_ok(rec(flag="flagged"), pis) is False
+    assert address_ok(rec(flag="fixed_untested"), pis) is False
+
+
+def test_address_ok_follows_the_debounced_flag_not_the_raw_mismatch():
+    # A mismatch alone doesn't turn the sensor off; AppState flags it after repeated checks.
+    assert address_ok(rec("fd00::6"), {"fd00::5"}) is True
 
 
 def test_hostname_host_yields_no_address():
