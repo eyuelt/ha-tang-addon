@@ -119,7 +119,8 @@ function renderBanner(s) {
   if (s.address_reserved) return null;
   const addr = s.primary_address;
   return h("div", { class: "banner" },
-    (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router (often called a DHCP reservation or static lease), then turn on 'Address reserved' in this " +
+    (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router's DHCP " +
+    "settings (often called a DHCP reservation or static lease), then turn on 'Address reserved' in this " +
     "add-on's settings.");
 }
 
