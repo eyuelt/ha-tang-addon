@@ -42,7 +42,7 @@ async def test_success_from_known_device_records_address(tmp_path):
 
 
 async def test_device_row_carries_the_devices_own_last_ip(tmp_path):
-    # The Devices row shows the device's own address separately from the Pi address it reaches Tang at.
+    # The Devices row shows the device's own address separately from the address it reaches Tang at.
     s = AppState(tmp_path, Options(["server.lan"], True), KEYS,
                  Namer(lookup={"192.168.1.50": "server.lan", "192.168.1.51": "server.lan"}.get))
     await s.handle_request(req(ip="192.168.1.50"))

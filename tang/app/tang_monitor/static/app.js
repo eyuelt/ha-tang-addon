@@ -101,7 +101,7 @@ const TEST_NOTE = "The test proves this machine can fetch its key from the new a
 function fixDetails(dev, c) {
   return details("fix:" + dev.device, "How to fix",
     h("p", {}, "1. Find the disk and binding slot."), findSteps(c.find),
-    h("p", {}, "2. Point the binding at this Pi."), cmd(c.fix),
+    h("p", {}, "2. Point the binding at this Home Assistant machine."), cmd(c.fix),
     h("p", {}, "3. Test it."), cmd(c.test), h("p", { class: "muted" }, TEST_NOTE),
     oneStep("fix:" + dev.device, c, true));
 }
@@ -176,7 +176,7 @@ function startFade() {
   setTimeout(() => { reserveConfirm = null; render(lastState); }, FADE_MS);
 }
 
-// How to pick the Pi out of the router's device list: the MAC is certain; the name is what the Pi sends the
+// How to pick this machine out of the router's device list: the MAC is certain; the name is what it sends the
 // router over DHCP, which routers usually show unless someone renamed the device there.
 function findPiHint(s) {
   const mac = s.pi_mac && h("code", {}, s.pi_mac);
@@ -196,8 +196,9 @@ function renderBanner(s) {
   const addr = s.primary_address;
   return h("div", { class: "banner" },
     h("div", {},
-      (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router's DHCP " +
-      "settings (often called a DHCP reservation or static lease), then press Mark as reserved."),
+      (addr ? "Reserve " + addr + " for this Home Assistant machine"
+        : "Reserve this Home Assistant machine's address") +
+      " in your router's DHCP settings (often called a DHCP reservation or static lease), then press Mark as reserved."),
     (s.pi_mac || s.pi_hostname) && h("div", {}, ...findPiHint(s)),
     h("div", { class: "row" },
       h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
@@ -212,7 +213,7 @@ function renderAlerts(s) {
     const piAddr = s.primary_address || "a different address";
     const line = d.flag === "fixed_untested"
       ? "Marked fixed, not yet tested. Run the test below, or restart " + d.device + "."
-      : d.device + " unlocks via " + d.last_ok_address + ", but this Pi is now at " + piAddr +
+      : d.device + " unlocks via " + d.last_ok_address + ", but Home Assistant is now at " + piAddr +
         ". It will show the password prompt at boot until this is fixed.";
     const fixedBtn = d.flag === "flagged" && h("button", { type: "button",
       onclick: () => post("api/devices/" + encodeURIComponent(d.device) + "/fixed") }, "I've fixed it");

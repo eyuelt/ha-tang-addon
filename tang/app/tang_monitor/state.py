@@ -29,7 +29,7 @@ class AppState:
         self.tang_running = False
         self.pi_addresses: set[str] | None = None
         self._primary_hint: str | None = None
-        self.pi_mac: str | None = None  # how to spot the Pi in the router's device list
+        self.pi_mac: str | None = None  # how to spot this machine in the router's device list
         self.pi_hostname: str | None = None
         self.on_forget: Callable[[str], Awaitable[None]] | None = None
         self.on_set_address_reserved: Callable[[bool], Awaitable[bool]] | None = None

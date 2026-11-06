@@ -33,7 +33,7 @@ def test_find_steps_mentions_old_address():
     assert "crypto_LUKS" in steps[0]["text"] and "/dev/sda2" in steps[0]["text"]
     assert steps[1]["command"] == "sudo clevis luks list -d <disk>"
     assert "192.168.1.50" in steps[1]["text"]
-    assert "with this Pi's address" in find_steps(None)[1]["text"]
+    assert "with the Home Assistant machine's address" in find_steps(None)[1]["text"]
 
 
 def _inner(script):

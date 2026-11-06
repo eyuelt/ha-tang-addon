@@ -20,7 +20,7 @@ def tang_config(pi_address: str, port: int, signing: KeyInfo) -> str:
 
 
 def find_steps(old_address: str | None) -> list[dict]:
-    which = old_address if old_address else "this Pi's address"
+    which = old_address if old_address else "the Home Assistant machine's address"
     return [
         {
             "text": (

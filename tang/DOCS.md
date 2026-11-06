@@ -2,17 +2,17 @@
 
 This add-on runs a [Tang](https://github.com/latchset/tang) server on port 7500. Devices with LUKS-encrypted disks
 use it, through [Clevis](https://github.com/latchset/clevis), to unlock themselves at boot while they are on your
-home network. The add-on also logs every request, checks that each device still reaches the Pi at the right
+home network. The add-on also logs every request, checks that each device still reaches Home Assistant at the right
 address, and shows all of this on a dashboard in the sidebar.
 
-Devices find Tang by the Pi's IP address, so that address must never change. Reserve it in your router's DHCP settings
+Devices find Tang by the Home Assistant machine's IP address, so that address must never change. Reserve it in your router's DHCP settings
 (often called a DHCP reservation or static lease).
 
 Keep port 7500 reachable only from your home network. Do not forward it from the internet.
 
 ## Setup
 
-1. Reserve the Pi's address in your router first, as described above. Then press
+1. Reserve the Home Assistant machine's address in your router first, as described above. Then press
    **Mark as reserved** on the yellow banner in the dashboard (or turn on **Address reserved** in this app's
    Configuration).
 2. Open the Tang panel, find the device's request in the history, and click **Mark as known**. No restart is needed.
@@ -23,7 +23,7 @@ Keep port 7500 reachable only from your home network. Do not forward it from the
    sudo clevis luks bind -d <disk> tang '{"url":"http://<pi-address>:7500","thp":"<signing fingerprint from the dashboard>"}'
    ```
 
-   `<disk>` is the encrypted partition (for example `/dev/nvme0n1p2`), `<pi-address>` is the Pi's reserved address,
+   `<disk>` is the encrypted partition (for example `/dev/nvme0n1p2`), `<pi-address>` is the Home Assistant machine's reserved address,
    and the signing fingerprint is shown in the dashboard's Keys section.
 4. Test it (this prints nothing secret and ends with `OK` on success):
 
@@ -42,7 +42,7 @@ within about a minute, with no restart.
 
 - **`known_devices`**: optional. Names of the devices you bound, as your router reports them (for example
   `server.lan`). You can also mark devices known from the dashboard. Requests from other devices are marked unknown.
-- **`address_reserved`**: turn on once the Pi's address is reserved. The dashboard's **Mark as reserved** button
+- **`address_reserved`**: turn on once the Home Assistant machine's address is reserved. The dashboard's **Mark as reserved** button
   sets this for you. This hides the reservation reminder.
 
 ## Home Assistant entities
@@ -50,7 +50,7 @@ within about a minute, with no restart.
 - `binary_sensor.tang_running`: whether Tang answers.
 - `sensor.tang_last_unlock`: the time of the last successful unlock, and which device it was.
 - `sensor.tang_last_unknown_request`: the time of the last request from a device not in `known_devices`.
-- `binary_sensor.tang_<device>_address_ok`: off when a device last reached the Pi at an address the Pi no longer
+- `binary_sensor.tang_<device>_address_ok`: off when a device last reached Home Assistant at an address it no longer
   has.
 
 Every request also fires a `tang_request` event, which you can use in automations.

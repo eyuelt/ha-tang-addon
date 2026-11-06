@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- Dashboard and docs no longer assume Home Assistant runs on a Raspberry Pi.
+
 ## 0.1.5
 
 - The reservation banner shows the Pi's MAC address and the name it likely has in your router's device list.

@@ -8,7 +8,7 @@ configuration:
   address_reserved:
     name: Address reserved
     description: >-
-      Turn on once you have reserved this Pi's IP address in your router. The dashboard's Mark as reserved
+      Turn on once you have reserved this Home Assistant machine's IP address in your router. The dashboard's Mark as reserved
       button sets this for you. Hides the reservation reminder.
 network:
   7500/tcp: Tang (home network only)

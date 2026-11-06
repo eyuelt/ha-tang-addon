@@ -30,7 +30,7 @@ class Supervisor:
         return {"Authorization": f"Bearer {self._token}"}
 
     async def network_info(self) -> tuple[set[str] | None, str | None, str | None]:
-        """(all Pi addresses, first IPv4 of the primary interface, that interface's MAC).
+        """(all of this machine's addresses, first IPv4 of the primary interface, that interface's MAC).
 
         Each part is None when unknown."""
         if self._token is None:
@@ -61,14 +61,14 @@ class Supervisor:
             self._fail("network_info", e)
             return None, None, None
         self._ok("network_info")
-        # No addresses at all (e.g. link down) is "unknown", not "the Pi has no address".
+        # No addresses at all (e.g. link down) is "unknown", not "the machine has no address".
         return (out or None), primary, mac
 
     async def pi_addresses(self) -> set[str] | None:
         return (await self.network_info())[0]
 
     async def host_name(self) -> str | None:
-        """The Pi's hostname, which it also sends to the router over DHCP; None when unknown."""
+        """This machine's hostname, which it also sends to the router over DHCP; None when unknown."""
         if self._token is None:
             return None
         try:
