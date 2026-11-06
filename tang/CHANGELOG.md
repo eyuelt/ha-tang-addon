@@ -4,8 +4,8 @@
 
 - The dashboard no longer shows a stale version after an app update.
 - Banners (reservation reminder and address-change alerts) share one layout: button beside the text on wide
-  windows, full width below it on narrow ones, spacing between paragraphs, and bold addresses, MACs and names
-  that no longer break mid-word.
+  windows, full width below it on narrow ones, spacing between paragraphs, and bold addresses, MACs and
+  device names that no longer break mid-word.
 - History: IP addresses stay on one line on narrow windows.
 
 ## 0.1.6

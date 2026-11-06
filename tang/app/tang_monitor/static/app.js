@@ -226,9 +226,10 @@ function renderBanner(s) {
 function renderAlerts(s) {
   return s.devices.filter(d => d.flag !== "none").map(d => {
     const piAddr = s.primary_address ? h("code", {}, s.primary_address) : "a different address";
+    const dev = h("code", {}, d.device);
     const line = d.flag === "fixed_untested"
-      ? "Marked fixed, not yet tested. Run the test below, or restart " + d.device + "."
-      : [d.device + " unlocks via ", h("code", {}, d.last_ok_address), ", but Home Assistant is now at ", piAddr,
+      ? ["Marked fixed, not yet tested. Run the test below, or restart ", dev, "."]
+      : [dev, " unlocks via ", h("code", {}, d.last_ok_address), ", but Home Assistant is now at ", piAddr,
         ". It will show the password prompt at boot until this is fixed."];
     const fixedBtn = d.flag === "flagged" && h("button", { type: "button",
       onclick: () => post("api/devices/" + encodeURIComponent(d.device) + "/fixed") }, "I've fixed it");

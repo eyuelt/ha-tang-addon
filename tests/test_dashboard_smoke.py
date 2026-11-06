@@ -61,7 +61,7 @@ def test_demo_dashboard_renders_real_dom(demo_url, tmp_path):
     # Every banner shares one layout: text, then actions on the right.
     assert 'class="banner warn"' in out and 'class="banner bad"' in out and 'class="alert' not in out
     assert re.search(r'class="banner bad">.*?<div class="actions"><button[^>]*>I\'ve fixed it<', out, re.S)
-    assert "unlocks via <code>192.168.1.87</code>, but Home Assistant is now at <code>192.168.1.112</code>" in out
+    assert "<code>laptop.lan</code> unlocks via <code>192.168.1.87</code>, but Home Assistant is now at <code>192.168.1.112</code>" in out
     assert '<code>02:00:00:00:00:01</code>' in out  # bold via .banner code, kept on one line
     assert "for this Home Assistant machine" in out and "this Pi" not in out
     assert "02:00:00:00:00:01" in out and "homeassistant" in out  # how to spot this machine in the router's list
