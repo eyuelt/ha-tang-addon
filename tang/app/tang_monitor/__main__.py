@@ -14,14 +14,14 @@ from .naming import Namer
 from .options import load_options, options_from_dict
 from .records import TangRequest
 from .state import AppState
-from .supervisor import Supervisor
+from .supervisor import TANG_CONTAINER_PORT, Supervisor
 from .tang_server import start_tang_server
 from .web import make_app
 
 log = logging.getLogger("tang_monitor")
 
 DATA_DIR = Path("/data")
-TANG_PORT = 7500
+TANG_PORT = TANG_CONTAINER_PORT
 WEB_PORT = 8099
 INTERVAL = 60.0
 _HEALTH_TIMEOUT = aiohttp.ClientTimeout(total=5)
@@ -75,6 +75,7 @@ async def refresh(state: AppState, sup: Supervisor, session: aiohttp.ClientSessi
     state.set_pi_addresses(addrs, primary)
     state.pi_mac = mac or state.pi_mac  # keep the last known value through a failed check
     state.pi_hostname = await sup.host_name() or state.pi_hostname
+    state.port = await sup.tang_port() or state.port  # the host port devices use, from the Network settings
     options = await sup.get_options()  # Configuration-tab edits apply here, with no restart
     if options is not None:
         state.update_options(options_from_dict(options))

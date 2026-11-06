@@ -4,7 +4,8 @@ configuration:
     description: >-
       Optional. Names of the devices you bind to this Tang server, as your router reports them (for example
       server.lan). You can also mark devices as known from the dashboard. Requests from any other device are
-      marked unknown. Changes apply within about a minute, with no restart.
+      marked unknown. Known is a label for the history, not a security check. Changes apply within about a
+      minute, with no restart.
   address_reserved:
     name: Address reserved
     description: >-

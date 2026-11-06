@@ -7,6 +7,7 @@ from .address_check import canonical_ip
 
 log = logging.getLogger(__name__)
 _TIMEOUT = aiohttp.ClientTimeout(total=10)
+TANG_CONTAINER_PORT = 7500  # Tang's port inside the container; config.yaml maps it to a host port
 
 
 class Supervisor:
@@ -83,6 +84,21 @@ class Supervisor:
             return None
         self._ok("host_name")
         return name
+
+    async def tang_port(self) -> int | None:
+        """The host port mapped to Tang in this app's Network settings; None when unknown or turned off."""
+        if self._token is None:
+            return None
+        try:
+            async with self._session.get(f"{self._base}/addons/self/info", headers=self._headers,
+                                         timeout=_TIMEOUT) as resp:
+                resp.raise_for_status()
+                port = ((await resp.json())["data"].get("network") or {}).get(f"{TANG_CONTAINER_PORT}/tcp")
+        except Exception as e:  # noqa: BLE001
+            self._fail("tang_port", e)
+            return None
+        self._ok("tang_port")
+        return port if type(port) is int else None  # bool is an int subclass; reject it
 
     async def get_options(self) -> dict | None:
         """The app's own validated options, or None when unknown."""

@@ -1,3 +1,4 @@
+import pytest
 from aiohttp import web
 
 from tang_monitor.supervisor import Supervisor
@@ -8,7 +9,10 @@ NET = {"data": {"interfaces": [{"ipv4": {"address": ["192.168.1.87/24"]},
 OPTS = {"result": "ok", "data": {"known_devices": ["server.lan"], "address_reserved": False}}
 
 
-async def make(aiohttp_client, status=200, opts_body=OPTS):
+INFO = {"result": "ok", "data": {"network": {"7500/tcp": 7600}}}
+
+
+async def make(aiohttp_client, status=200, opts_body=OPTS, info_body=INFO):
     seen = []
 
     async def net(request):
@@ -38,6 +42,11 @@ async def make(aiohttp_client, status=200, opts_body=OPTS):
         return web.json_response({"result": "ok"}, status=status)
     app.router.add_get("/addons/self/options/config", get_opts)
     app.router.add_post("/addons/self/options", set_opts)
+
+    async def info(request):
+        seen.append(("GET", request.path, request.headers.get("Authorization"), None))
+        return web.json_response(info_body, status=status)
+    app.router.add_get("/addons/self/info", info)
     client = await aiohttp_client(app)
     return client, seen
 
@@ -222,3 +231,26 @@ async def test_set_options_false_on_errors_or_no_token(aiohttp_client):
     dead = Supervisor(client.session, "tok", base="http://127.0.0.1:1")
     assert await dead.set_options({"a": 1}) is False
     assert await dead.get_options() is None
+
+
+async def test_tang_port_is_the_host_port_mapped_in_network_settings(aiohttp_client):
+    client, seen = await make(aiohttp_client)
+    sup = Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
+    assert await sup.tang_port() == 7600
+    assert seen == [("GET", "/addons/self/info", "Bearer tok", None)]
+
+
+@pytest.mark.parametrize("network", [{"7500/tcp": None}, {}, None, {"7500/tcp": "7600"}, {"7500/tcp": True}])
+async def test_tang_port_none_when_disabled_or_malformed(aiohttp_client, network):
+    client, _ = await make(aiohttp_client, info_body={"result": "ok", "data": {"network": network}})
+    sup = Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
+    assert await sup.tang_port() is None
+
+
+async def test_tang_port_none_on_error_or_without_token(aiohttp_client):
+    client, seen = await make(aiohttp_client, status=403)
+    base = str(client.make_url("")).rstrip("/")
+    assert await Supervisor(client.session, "tok", base=base).tang_port() is None
+    seen.clear()
+    assert await Supervisor(client.session, None, base=base).tang_port() is None
+    assert seen == []

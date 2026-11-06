@@ -13,7 +13,7 @@ every request, shows a dashboard in the Home Assistant sidebar, and publishes en
 
 ## Security
 
-Tang must only be reachable from your home network. Do not port-forward port 7500 from your router.
+Tang must only be reachable from your home network. Do not port-forward Tang's port (7500 by default) from your router.
 
 ## Documentation
 

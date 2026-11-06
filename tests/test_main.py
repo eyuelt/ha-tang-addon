@@ -17,7 +17,8 @@ KEYS = [KeyInfo("a", "signing", "S256A", "S1A"), KeyInfo("b", "exchange", "S256B
 
 
 class FakeSupervisor:
-    def __init__(self, addrs=None, fail=(), primary=None, options=None, mac=None, hostname=None):
+    def __init__(self, addrs=None, fail=(), primary=None, options=None, mac=None, hostname=None, port=None):
+        self.port = port
         self.options = options
         self.mac = mac
         self.hostname = hostname
@@ -40,6 +41,9 @@ class FakeSupervisor:
 
     async def get_options(self):
         return self.options
+
+    async def tang_port(self):
+        return self.port
 
     async def set_options(self, options):
         self.set_calls.append(options)
@@ -186,3 +190,16 @@ async def test_refresh_records_pi_mac_and_hostname_keeping_last_known(tmp_path):
     assert (state.pi_mac, state.pi_hostname) == ("02:00:00:00:00:01", "homeassistant")
     snap = state.snapshot()
     assert (snap["pi_mac"], snap["pi_hostname"]) == ("02:00:00:00:00:01", "homeassistant")
+
+
+async def test_refresh_uses_the_mapped_host_port_keeping_last_known(tmp_path):
+    import aiohttp
+    state = make_state(tmp_path)
+    assert state.port == 7500  # the default mapping, until Home Assistant says otherwise
+    sup = FakeSupervisor(port=7600)
+    async with aiohttp.ClientSession() as session:
+        await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
+        assert state.port == 7600
+        sup.port = None  # a failed check, or the port turned off
+        await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
+    assert state.port == 7600
