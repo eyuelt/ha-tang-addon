@@ -94,3 +94,26 @@ def test_mismatch_is_pure_tristate():
 def test_unknown_pi_addresses_leave_existing_flag_on_success(flag):
     r = apply_success(rec(flag=flag), "d", "192.168.1.112", T2, None)
     assert r.flag == flag
+
+
+def prec(port, flag="none"):
+    return DeviceRecord("d", "192.168.1.87", T, flag, port)
+
+
+def test_port_change_is_a_mismatch_when_tang_port_known():
+    assert mismatch(prec(7500), {"192.168.1.87"}, 7600) is True
+    assert apply_check(prec(7500), {"192.168.1.87"}, 7600).flag == "flagged"
+    assert mismatch(prec(7600), {"192.168.1.87"}, 7600) is False
+
+
+def test_unknown_ports_never_mismatch():
+    assert mismatch(prec(7500), {"192.168.1.87"}, None) is False  # Tang's port not confirmed yet
+    assert mismatch(prec(None), {"192.168.1.87"}, 7600) is False  # recorded before ports were tracked
+    assert apply_check(prec(None), {"192.168.1.87"}, 7600).flag == "none"
+
+
+def test_success_records_port_and_clears_flag_only_on_matching_port():
+    r = apply_success(prec(7500, "flagged"), "d", "192.168.1.87", T2, {"192.168.1.87"}, 7500, 7600)
+    assert (r.last_ok_port, r.flag) == (7500, "flagged")  # still the old port
+    r = apply_success(r, "d", "192.168.1.87", T2, {"192.168.1.87"}, 7600, 7600)
+    assert (r.last_ok_port, r.flag) == (7600, "none")

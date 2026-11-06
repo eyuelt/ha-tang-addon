@@ -11,6 +11,10 @@ Devices find Tang by the Home Assistant machine's IP address, so that address mu
 Tang listens on port 7500 by default. You can change it in the **Network** section of this app's Configuration
 tab. This page writes `<port>` for whichever port you use.
 
+Changing the port later breaks every device you have already bound: each binding stores the full address and port,
+so those devices fall back to the password prompt until you update them. The dashboard flags each one (for example
+"unlocks via 192.168.1.87:7500, but Tang is now at 192.168.1.87:7600") and shows how to fix it.
+
 Keep that port reachable only from your home network. Do not forward it from the internet.
 
 ## Setup
@@ -65,8 +69,8 @@ separate network that can't reach Tang.
 - `binary_sensor.tang_running`: whether Tang answers.
 - `sensor.tang_last_unlock`: the time of the last successful unlock, and which device it was.
 - `sensor.tang_last_unknown_request`: the time of the last request from a device that isn't known.
-- `binary_sensor.tang_<device>_address_ok`: off when a device last reached Home Assistant at an address it no longer
-  has.
+- `binary_sensor.tang_<device>_address_ok`: off when a device last reached Tang at an address or port that no longer
+  reaches it.
 
 Every request also fires a `tang_request` event, which you can use in automations. Its data holds `device`,
 `known`, `ip`, `kind` (`adv` for fetching keys, `rec` for an unlock, `other` for anything else), `status` (the HTTP
@@ -74,8 +78,8 @@ status, `200` on success) and `host`.
 
 ### Get notified of every unlock
 
-A successful unlock (`kind: rec`, `status: 200`) only happens when a bound device boots, so it is a better signal
-than the known label: you can tell whether you expected it. To get a phone notification for each one, create an
+A successful unlock (`kind: rec`, `status: 200`) happens when a bound device boots, or when you run a test or fix
+command on it. That makes it a better signal than the known label: you can tell whether you expected it. To get a phone notification for each one, create an
 automation and paste this in the editor's **Edit in YAML** mode, replacing `mobile_app_your_phone` with your own
 notify action:
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.8
+
+- Tang's port can be changed in the app's Network settings; the generated commands and docs use whichever port is set.
+- Each device's port is tracked along with its address. If the port changes, the dashboard flags every device still
+  using the old one, in a single message such as "unlocks via 192.168.1.87:7500, but Tang is now at
+  192.168.1.87:7600".
+- Docs: "known" is a label, not a security check; the `tang_request` event's fields; an unlock-notification example.
+
 ## 0.1.7
 
 - The dashboard no longer shows a stale version after an app update.

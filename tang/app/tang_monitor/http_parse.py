@@ -64,3 +64,22 @@ def host_address(host: str | None) -> str | None:
     if host.count(":") == 1:
         return host.split(":", 1)[0] or None
     return host
+
+
+def host_port(host: str | None) -> int | None:
+    """The port in a Host header (80, the http default, when absent); None when missing or invalid."""
+    if not host:
+        return None
+    if host.startswith("["):
+        end = host.find("]")
+        rest = host[end + 1:] if end > 1 else ""
+    elif host.count(":") == 1:
+        rest = host[host.index(":"):]
+    else:
+        rest = ""  # a bare name, IPv4 address or unbracketed IPv6 address
+    if not rest:
+        return 80
+    if not rest.startswith(":") or not rest[1:].isdigit():
+        return None
+    port = int(rest[1:])
+    return port if 0 < port < 65536 else None

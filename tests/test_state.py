@@ -7,7 +7,7 @@ from tang_monitor.keys import KeyInfo
 from tang_monitor.naming import Namer
 from tang_monitor.options import Options, load_options, options_from_dict
 from tang_monitor.records import TangRequest
-from tang_monitor.state import AppState
+from tang_monitor.state import MISMATCH_CHECKS, AppState
 
 T = datetime(2026, 1, 1, 15, 42, tzinfo=timezone.utc)
 KEYS = [KeyInfo("a", "signing", "S256A", "S1A"), KeyInfo("b", "exchange", "S256B", "S1B")]
@@ -365,3 +365,30 @@ async def test_update_options_changes_known_status_immediately(tmp_path):
     assert not (await s.handle_request(req(ip="192.168.1.66"))).known
     s.update_options(Options(["server.lan", "stranger.lan"], True))
     assert (await s.handle_request(req(ip="192.168.1.66"))).known
+
+
+async def test_port_change_flags_device_after_debounce_and_success_on_new_port_clears(tmp_path):
+    s = make_state(tmp_path)
+    s.set_tang_port(7500)
+    s.set_pi_addresses({"192.168.1.87"})
+    await s.handle_request(req(host="192.168.1.87:7500"))
+    dev = s.snapshot()["devices"][0]
+    assert (dev["last_ok_address"], dev["last_ok_port"], dev["flag"]) == ("192.168.1.87", 7500, "none")
+    s.set_tang_port(7600)  # the port was changed in the Network settings
+    for _ in range(MISMATCH_CHECKS - 1):
+        s.set_pi_addresses({"192.168.1.87"})
+    assert s.snapshot()["devices"][0]["flag"] == "none"
+    s.set_pi_addresses({"192.168.1.87"})
+    snap = s.snapshot()
+    assert snap["devices"][0]["flag"] == "flagged" and snap["port"] == 7600
+    await s.handle_request(req(host="192.168.1.87:7600"))
+    assert s.snapshot()["devices"][0]["flag"] == "none"
+
+
+async def test_unconfirmed_port_never_flags(tmp_path):
+    s = make_state(tmp_path)  # Home Assistant hasn't confirmed the port yet; the default is 7500
+    s.set_pi_addresses({"192.168.1.87"})
+    await s.handle_request(req(host="192.168.1.87:7600"))
+    for _ in range(MISMATCH_CHECKS):
+        s.set_pi_addresses({"192.168.1.87"})
+    assert s.snapshot()["devices"][0]["flag"] == "none"

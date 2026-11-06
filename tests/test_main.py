@@ -199,7 +199,7 @@ async def test_refresh_uses_the_mapped_host_port_keeping_last_known(tmp_path):
     sup = FakeSupervisor(port=7600)
     async with aiohttp.ClientSession() as session:
         await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
-        assert state.port == 7600
+        assert state.port == 7600 and state.port_known
         sup.port = None  # a failed check, or the port turned off
         await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
-    assert state.port == 7600
+    assert state.port == 7600 and state.port_known

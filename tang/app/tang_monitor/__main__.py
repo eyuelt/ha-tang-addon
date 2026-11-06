@@ -71,11 +71,13 @@ async def refresh(state: AppState, sup: Supervisor, session: aiohttp.ClientSessi
     if running != state.tang_running:
         log.info("Tang is %s", "running" if running else "NOT running")
     state.tang_running = running
+    port = await sup.tang_port()  # the host port devices use, from the Network settings
+    if port:
+        state.set_tang_port(port)  # before the address check, which compares ports too
     addrs, primary, mac = await sup.network_info()
     state.set_pi_addresses(addrs, primary)
     state.pi_mac = mac or state.pi_mac  # keep the last known value through a failed check
     state.pi_hostname = await sup.host_name() or state.pi_hostname
-    state.port = await sup.tang_port() or state.port  # the host port devices use, from the Network settings
     options = await sup.get_options()  # Configuration-tab edits apply here, with no restart
     if options is not None:
         state.update_options(options_from_dict(options))

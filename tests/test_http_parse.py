@@ -1,4 +1,4 @@
-from tang_monitor.http_parse import parse_request_head, classify, parse_status, host_address
+from tang_monitor.http_parse import parse_request_head, classify, parse_status, host_address, host_port
 import pytest
 
 def test_parses_rec_post():
@@ -26,3 +26,12 @@ def test_parse_status():
     ("[fe80::1]:7500", "fe80::1"), ("pi.lan:7500", "pi.lan"), (None, None), ("", None)])
 def test_host_address(host, addr):
     assert host_address(host) == addr
+
+
+@pytest.mark.parametrize("host,port", [
+    ("192.168.1.87:7500", 7500), ("[fd00::5]:7600", 7600),
+    ("192.168.1.87", 80), ("[fd00::5]", 80), ("fd00::5", 80),  # no port: the http default
+    (None, None), ("", None), ("192.168.1.87:abc", None), ("192.168.1.87:0", None), ("192.168.1.87:70000", None),
+])
+def test_host_port(host, port):
+    assert host_port(host) == port

@@ -50,3 +50,19 @@ def test_wrong_shape_is_quarantined(tmp_path: Path, content):
     assert (tmp_path / "devices.json.corrupt").read_text() == content
     s.put(DeviceRecord("a", "1.1.1.1", T))
     assert (tmp_path / "devices.json.corrupt").read_text() == content
+
+
+def test_port_round_trips_and_old_files_load_without_it(tmp_path):
+    from tang_monitor.devices import DeviceRecord, DeviceStore
+    from datetime import datetime, timezone
+    at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    s = DeviceStore(tmp_path / "d.json")
+    s.put(DeviceRecord("a", "192.168.1.87", at, "none", 7600))
+    assert DeviceStore(tmp_path / "d.json").get("a").last_ok_port == 7600
+    old = tmp_path / "old.json"
+    old.write_text('[{"device": "b", "last_ok_address": "192.168.1.87", "last_ok_at": "2026-01-01T00:00:00+00:00"}]')
+    assert DeviceStore(old).get("b").last_ok_port is None
+    bad = tmp_path / "bad.json"
+    bad.write_text('[{"device": "c", "last_ok_address": "192.168.1.87", "last_ok_at": "2026-01-01T00:00:00+00:00",'
+                   ' "last_ok_port": "7600"}]')
+    assert DeviceStore(bad).get("c").last_ok_port is None

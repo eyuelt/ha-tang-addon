@@ -7,13 +7,21 @@ from typing import Literal
 
 from . import commands
 from .address_check import (canonical_ip, address_ok, apply_check, apply_fixed, apply_success,
-                            mismatch, success_address)
+                            mismatch, points_here, success_address)
 from .devices import DeviceStore
+from .http_parse import host_port
 from .keys import KeyInfo
 from .known import KnownDevices
 from .naming import Namer, is_known_request, normalize_id
 from .options import Options
 from .records import LoggedRequest, RequestLog, TangRequest
+
+
+def endpoint(address: str, port: int | None) -> str:
+    """address:port as a person would type it ([v6]:port); just the address when the port is unknown."""
+    if port is None:
+        return address
+    return f"[{address}]:{port}" if ":" in address else f"{address}:{port}"
 
 
 MISMATCH_CHECKS = 3  # consecutive mismatching checks before a device is flagged
@@ -25,7 +33,8 @@ class AppState:
         self.options = options
         self.keys = keys
         self.namer = namer
-        self.port = port
+        self.port = port  # Tang's port as devices see it; the default until Home Assistant confirms it
+        self.port_known = False
         self.tang_running = False
         self.pi_addresses: set[str] | None = None
         self._primary_hint: str | None = None
@@ -41,6 +50,13 @@ class AppState:
     @staticmethod
     def _name_of(entry: LoggedRequest) -> str | None:
         return entry.device if entry.device != entry.request.ip else None
+
+    def set_tang_port(self, port: int) -> None:
+        self.port, self.port_known = port, True
+
+    def _tang_port(self) -> int | None:
+        """The confirmed port for address checks; None means "don't judge ports yet"."""
+        return self.port if self.port_known else None
 
     def update_options(self, options: Options) -> None:
         self.options = options
@@ -63,17 +79,18 @@ class AppState:
         self.log.append(entry)
         addr = success_address(entry)
         if addr is not None:
-            if self.pi_addresses is not None and addr in self.pi_addresses:
+            port = host_port(req.host)
+            if self.pi_addresses is not None and points_here(addr, port, self.pi_addresses, self._tang_port()):
                 self._mismatches.pop(device, None)
             self.store.put(apply_success(self.store.get(device), device, addr, req.at,
-                                         self.pi_addresses))
+                                         self.pi_addresses, port, self._tang_port()))
         return entry
 
     def set_pi_addresses(self, addrs: set[str] | None, primary: str | None = None) -> None:
         self.pi_addresses = None if addrs is None else set(addrs)
         self._primary_hint = primary if addrs is not None else None
         for rec in self.store.all():
-            m = mismatch(rec, self.pi_addresses)
+            m = mismatch(rec, self.pi_addresses, self._tang_port())
             if m is None:
                 continue
             if not m:
@@ -82,7 +99,7 @@ class AppState:
             n = self._mismatches.get(rec.device, 0) + 1
             self._mismatches[rec.device] = n
             if n >= MISMATCH_CHECKS:
-                self.store.put(apply_check(rec, self.pi_addresses))
+                self.store.put(apply_check(rec, self.pi_addresses, self._tang_port()))
 
     def mark_fixed(self, device: str) -> Literal["ok", "not_found", "not_flagged"]:
         rec = self.store.get(device)
@@ -106,7 +123,7 @@ class AppState:
             addr = success_address(as_known)
             if addr is not None:
                 self.store.put(apply_success(self.store.get(device), device, addr, e.request.at,
-                                             self.pi_addresses))
+                                             self.pi_addresses, host_port(e.request.host), self._tang_port()))
                 break
         return "ok"
 
@@ -166,9 +183,11 @@ class AppState:
         for r in self.store.all():
             cmds = None
             if can_cmd and r.flag != "none":
-                cmds = commands.device_commands(r.last_ok_address, primary, self.port, self.keys)
+                cmds = commands.device_commands(endpoint(r.last_ok_address, r.last_ok_port), primary, self.port,
+                                                self.keys)
             devices.append({
                 "device": r.device, "last_ip": last_ip.get(r.device), "last_ok_address": r.last_ok_address,
+                "last_ok_port": r.last_ok_port,
                 "last_ok_at": r.last_ok_at.isoformat(), "flag": r.flag,
                 "address_ok": address_ok(r, self.pi_addresses), "commands": cmds})
         test_commands = None
@@ -180,6 +199,7 @@ class AppState:
         return {
             "running": self.tang_running,
             "primary_address": primary,
+            "port": self.port,
             "pi_mac": self.pi_mac,
             "pi_hostname": self.pi_hostname,
             "pi_addresses": None if self.pi_addresses is None else sorted(self.pi_addresses),

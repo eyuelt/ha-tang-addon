@@ -13,6 +13,7 @@ class DeviceRecord:
     last_ok_address: str
     last_ok_at: datetime
     flag: Literal["none", "flagged", "fixed_untested"] = "none"
+    last_ok_port: int | None = None  # None for records saved before ports were tracked
 
 
 class DeviceStore:
@@ -24,17 +25,19 @@ class DeviceStore:
             if not isinstance(raw, list):
                 raise TypeError("expected a list")
             for d in raw:
+                port = d.get("last_ok_port")
                 rec = DeviceRecord(d["device"], d["last_ok_address"],
-                                   datetime.fromisoformat(d["last_ok_at"]), d.get("flag", "none"))
+                                   datetime.fromisoformat(d["last_ok_at"]), d.get("flag", "none"),
+                                   port if type(port) is int else None)
                 self._devices[rec.device] = rec
-        except (KeyError, TypeError, ValueError):
+        except (AttributeError, KeyError, TypeError, ValueError):
             self._devices = {}
             jsonfile.quarantine(path)
 
     def _persist(self) -> None:
         jsonfile.save(self._path, [
             {"device": r.device, "last_ok_address": r.last_ok_address,
-             "last_ok_at": r.last_ok_at.isoformat(), "flag": r.flag}
+             "last_ok_at": r.last_ok_at.isoformat(), "flag": r.flag, "last_ok_port": r.last_ok_port}
             for r in self._devices.values()])
 
     def get(self, device: str) -> DeviceRecord | None:

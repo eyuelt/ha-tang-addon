@@ -26,27 +26,33 @@ def success_address(entry: LoggedRequest) -> str | None:
     return canonical_ip(host_address(r.host))
 
 
+def points_here(address: str, port: int | None, pi_addresses: set[str], tang_port: int | None) -> bool:
+    """True if address:port reaches this Tang. An unknown port (either side) only checks the address."""
+    return address in pi_addresses and (port is None or tang_port is None or port == tang_port)
+
+
 def apply_success(prev: DeviceRecord | None, device: str, address: str, at: datetime,
-                  pi_addresses: set[str] | None) -> DeviceRecord:
+                  pi_addresses: set[str] | None, port: int | None = None,
+                  tang_port: int | None = None) -> DeviceRecord:
     flag = prev.flag if prev else "none"
-    if pi_addresses is not None and address in pi_addresses:
+    if pi_addresses is not None and points_here(address, port, pi_addresses, tang_port):
         flag = "none"
-    return DeviceRecord(device, address, at, flag)
+    return DeviceRecord(device, address, at, flag, port)
 
 
-def apply_check(rec: DeviceRecord, pi_addresses: set[str] | None) -> DeviceRecord:
-    if pi_addresses is None:
-        return rec
-    if rec.flag == "none" and rec.last_ok_address not in pi_addresses:
+def apply_check(rec: DeviceRecord, pi_addresses: set[str] | None,
+                tang_port: int | None = None) -> DeviceRecord:
+    if mismatch(rec, pi_addresses, tang_port):
         return replace(rec, flag="flagged")
     return rec
 
 
-def mismatch(rec: DeviceRecord, pi_addresses: set[str] | None) -> bool | None:
-    """True if a not-yet-flagged device points at an address this machine lacks; None if unknown."""
+def mismatch(rec: DeviceRecord, pi_addresses: set[str] | None, tang_port: int | None = None) -> bool | None:
+    """True if a not-yet-flagged device points at an address or port this Tang lacks; None if unknown."""
     if pi_addresses is None:
         return None
-    return rec.flag == "none" and rec.last_ok_address not in pi_addresses
+    return rec.flag == "none" and not points_here(rec.last_ok_address, rec.last_ok_port, pi_addresses,
+                                                  tang_port)
 
 
 def apply_fixed(rec: DeviceRecord) -> DeviceRecord:

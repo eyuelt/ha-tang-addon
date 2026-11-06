@@ -191,6 +191,12 @@ function findPiHint(s) {
 // narrow windows the actions become full width under the text (style.css). `below` spans the full width
 // underneath (e.g. "How to fix"). kind: "warn" | "bad" | "ok". A paragraph is a string, an array of parts,
 // or a ready-made element.
+// address:port as a person would type it ([v6]:port); just the address when the port is unknown.
+function endpoint(addr, port) {
+  if (port == null) return addr;
+  return (addr.includes(":") ? "[" + addr + "]" : addr) + ":" + port;
+}
+
 function banner(kind, paras, actions, ...below) {
   const acts = (actions || []).filter(Boolean);
   const ps = paras.filter(Boolean).map(p => p instanceof Node ? p : h("p", {}, p));
@@ -225,11 +231,12 @@ function renderBanner(s) {
 
 function renderAlerts(s) {
   return s.devices.filter(d => d.flag !== "none").map(d => {
-    const piAddr = s.primary_address ? h("code", {}, s.primary_address) : "a different address";
+    const tangAt = s.primary_address ? h("code", {}, endpoint(s.primary_address, s.port)) : "a different address";
     const dev = h("code", {}, d.device);
     const line = d.flag === "fixed_untested"
       ? ["Marked fixed, not yet tested. Run the test below, or restart ", dev, "."]
-      : [dev, " unlocks via ", h("code", {}, d.last_ok_address), ", but Home Assistant is now at ", piAddr,
+      : [dev, " unlocks via ", h("code", {}, endpoint(d.last_ok_address, d.last_ok_port)), ", but Tang is now at ",
+        tangAt,
         ". It will show the password prompt at boot until this is fixed."];
     const fixedBtn = d.flag === "flagged" && h("button", { type: "button",
       onclick: () => post("api/devices/" + encodeURIComponent(d.device) + "/fixed") }, "I've fixed it");
@@ -276,7 +283,7 @@ function renderDevices(s) {
     h("div", { style: "flex:1" },
       h("strong", {}, device),
       rec ? [...(rec.last_ip ? [" (", h("code", {}, rec.last_ip), ")"] : []),
-        " · reaches Tang at ", h("code", {}, rec.last_ok_address),
+        " · reaches Tang at ", h("code", {}, endpoint(rec.last_ok_address, rec.last_ok_port)),
         " · last seen " + fmtTime(rec.last_ok_at) +
         " · " + (rec.flag === "none" ? "OK" : rec.flag === "flagged" ? "needs fixing" : "fixed, not yet tested")]
         : " · known, not seen yet"),
