@@ -11,7 +11,7 @@ from aiohttp import web
 from .entities import build_entities, device_slug, event_data
 from .keys import ensure_keys, load_keys
 from .naming import Namer
-from .options import load_options
+from .options import load_options, options_from_dict
 from .records import TangRequest
 from .state import AppState
 from .supervisor import Supervisor
@@ -71,7 +71,13 @@ async def refresh(state: AppState, sup: Supervisor, session: aiohttp.ClientSessi
     if running != state.tang_running:
         log.info("Tang is %s", "running" if running else "NOT running")
     state.tang_running = running
-    state.set_pi_addresses(*await sup.network_info())
+    addrs, primary, mac = await sup.network_info()
+    state.set_pi_addresses(addrs, primary)
+    state.pi_mac = mac or state.pi_mac  # keep the last known value through a failed check
+    state.pi_hostname = await sup.host_name() or state.pi_hostname
+    options = await sup.get_options()  # Configuration-tab edits apply here, with no restart
+    if options is not None:
+        state.update_options(options_from_dict(options))
     await publish(state, sup)
 
 

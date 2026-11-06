@@ -117,6 +117,7 @@ def _demo_state():
         return True
     s.on_set_address_reserved = demo_reserve
     s.tang_running = True
+    s.pi_mac, s.pi_hostname = "02:00:00:00:00:01", "homeassistant"
     for _ in range(3):  # the flag needs 3 consecutive mismatching checks
         s.set_pi_addresses({"192.168.1.112"}, primary="192.168.1.112")
     return s

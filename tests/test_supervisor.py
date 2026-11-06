@@ -104,7 +104,7 @@ async def test_empty_address_list_is_unknown(aiohttp_client):
     client = await aiohttp_client(app)
     sup = Supervisor(client.session, "tok", base=str(client.make_url("")).rstrip("/"))
     assert await sup.pi_addresses() is None
-    assert await sup.network_info() == (None, None)
+    assert await sup.network_info() == (None, None, None)
 
 
 async def _sup_with_net(aiohttp_client, ifaces):
@@ -120,16 +120,53 @@ async def _sup_with_net(aiohttp_client, ifaces):
 async def test_primary_is_first_ipv4_of_primary_interface(aiohttp_client):
     sup = await _sup_with_net(aiohttp_client, [
         {"primary": False, "ipv4": {"address": ["10.0.0.1/24"]}},
-        {"primary": True, "ipv4": {"address": ["192.168.1.87/24", "192.168.1.90/24"]},
+        {"primary": True, "mac": "02:00:00:00:00:01", "ipv4": {"address": ["192.168.1.87/24", "192.168.1.90/24"]},
          "ipv6": {"address": ["fd00::5/64"]}}])
-    addrs, primary = await sup.network_info()
+    addrs, primary, mac = await sup.network_info()
     assert primary == "192.168.1.87"
+    assert mac == "02:00:00:00:00:01"
     assert addrs == {"10.0.0.1", "192.168.1.87", "192.168.1.90", "fd00::5"}
 
 
 async def test_no_primary_interface_gives_none_primary(aiohttp_client):
     sup = await _sup_with_net(aiohttp_client, [{"primary": False, "ipv4": {"address": ["10.0.0.1/24"]}}])
-    assert (await sup.network_info())[1] is None
+    assert (await sup.network_info())[1:] == (None, None)
+
+
+async def test_mac_ignored_when_primary_interface_has_no_ipv4(aiohttp_client):
+    sup = await _sup_with_net(aiohttp_client, [{"primary": True, "mac": "02:00:00:00:00:01", "ipv4": None,
+                                                "ipv6": {"address": ["fd00::5/64"]}}])
+    assert (await sup.network_info())[1:] == (None, None)
+
+
+async def _sup_with_host(aiohttp_client, body, status=200, token="tok"):
+    seen = []
+
+    async def host(request):
+        seen.append(request.headers.get("Authorization"))
+        return web.json_response(body, status=status)
+
+    app = web.Application()
+    app.router.add_get("/host/info", host)
+    client = await aiohttp_client(app)
+    return Supervisor(client.session, token, base=str(client.make_url("")).rstrip("/")), seen
+
+
+async def test_host_name_reads_host_info(aiohttp_client):
+    sup, seen = await _sup_with_host(aiohttp_client, {"result": "ok", "data": {"hostname": "homeassistant"}})
+    assert await sup.host_name() == "homeassistant"
+    assert seen == ["Bearer tok"]
+
+
+async def test_host_name_none_on_error_bad_data_or_no_token(aiohttp_client):
+    sup, _ = await _sup_with_host(aiohttp_client, {"result": "error"}, status=500)
+    assert await sup.host_name() is None
+    sup, _ = await _sup_with_host(aiohttp_client, {"result": "ok", "data": {"hostname": ""}})
+    assert await sup.host_name() is None
+    sup, _ = await _sup_with_host(aiohttp_client, {"result": "ok", "data": {"hostname": 5}})
+    assert await sup.host_name() is None
+    sup, seen = await _sup_with_host(aiohttp_client, {"result": "ok", "data": {"hostname": "x"}}, token=None)
+    assert await sup.host_name() is None and seen == []
 
 
 async def test_remove_state_deletes_with_token(aiohttp_client):

@@ -176,6 +176,17 @@ function startFade() {
   setTimeout(() => { reserveConfirm = null; render(lastState); }, FADE_MS);
 }
 
+// How to pick the Pi out of the router's device list: the MAC is certain; the name is what the Pi sends the
+// router over DHCP, which routers usually show unless someone renamed the device there.
+function findPiHint(s) {
+  const mac = s.pi_mac && h("code", {}, s.pi_mac);
+  const name = s.pi_hostname && h("code", {}, s.pi_hostname);
+  if (mac && name) return ["In your router's device list, it's the one with MAC address ", mac,
+    ", probably named ", name, "."];
+  if (mac) return ["In your router's device list, it's the one with MAC address ", mac, "."];
+  return ["In your router's device list, it's probably named ", name, "."];
+}
+
 function renderBanner(s) {
   if (reserveConfirm) {
     return h("div", { class: "banner ok" + (reserveConfirm === "fading" ? " fade" : "") },
@@ -187,12 +198,13 @@ function renderBanner(s) {
     h("div", {},
       (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router's DHCP " +
       "settings (often called a DHCP reservation or static lease), then press Mark as reserved."),
+    (s.pi_mac || s.pi_hostname) && h("div", {}, ...findPiHint(s)),
     h("div", { class: "row" },
       h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
         : { type: "button", onclick: markReserved }, "Mark as reserved"),
       reserveSaving && h("span", {}, "Saving…")),
     reserveError && h("div", { class: "err" }, reserveError + " You can also turn on Address reserved in this " +
-      "app's Configuration, then restart the app."));
+      "app's Configuration."));
 }
 
 function renderAlerts(s) {
@@ -256,8 +268,7 @@ function renderDevices(s) {
     forgetControl(device)))
     : h("span", { class: "muted" }, "No devices tracked yet.");
   const note = forgetNote && h("p", { class: "muted" }, forgetNote +
-    " is also listed in this app's Configuration (Known devices). Remove it there and restart the app to stop " +
-    "treating it as known.");
+    " is also listed in this app's Configuration (Known devices). Remove it there to stop treating it as known.");
   return [h("h2", {}, "Devices"), h("div", { class: "card" }, body, note)];
 }
 

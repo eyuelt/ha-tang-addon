@@ -17,8 +17,10 @@ KEYS = [KeyInfo("a", "signing", "S256A", "S1A"), KeyInfo("b", "exchange", "S256B
 
 
 class FakeSupervisor:
-    def __init__(self, addrs=None, fail=(), primary=None, options=None):
+    def __init__(self, addrs=None, fail=(), primary=None, options=None, mac=None, hostname=None):
         self.options = options
+        self.mac = mac
+        self.hostname = hostname
         self.set_calls: list[dict] = []
         self.set_ok = True
         self.addrs = addrs
@@ -31,7 +33,10 @@ class FakeSupervisor:
     async def network_info(self):
         if "pi_addresses" in self.fail:
             raise RuntimeError("boom")
-        return self.addrs, self.primary
+        return self.addrs, self.primary, self.mac
+
+    async def host_name(self):
+        return self.hostname
 
     async def get_options(self):
         return self.options
@@ -140,13 +145,20 @@ async def test_refresh_loop_survives_a_failing_iteration(tmp_path, caplog):
     assert "refresh failed" in caplog.text
 
 
-async def test_refresh_does_not_reload_options(tmp_path):
-    # Configuration-tab edits take effect on restart; only dashboard actions change options live.
+async def test_refresh_applies_options_from_supervisor(tmp_path):
     import aiohttp
     state = make_state(tmp_path)
-    sup = FakeSupervisor(options={"known_devices": ["a.lan"], "address_reserved": True})
+    sup = FakeSupervisor(options={"known_devices": ["a.lan", " "], "address_reserved": True})
     async with aiohttp.ClientSession() as session:
         await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
+    assert state.options == Options(["a.lan"], True)
+
+
+async def test_refresh_keeps_options_when_supervisor_returns_none(tmp_path):
+    import aiohttp
+    state = make_state(tmp_path)
+    async with aiohttp.ClientSession() as session:
+        await main.refresh(state, FakeSupervisor(options=None), session, "http://127.0.0.1:1/adv")
     assert state.options == Options(["server.lan"], False)
 
 
@@ -159,3 +171,18 @@ async def test_set_reserved_callback_sends_full_merged_dict(tmp_path):
     sup.options = None
     assert await cb(True) is False
     assert len(sup.set_calls) == 1
+
+
+async def test_refresh_records_pi_mac_and_hostname_keeping_last_known(tmp_path):
+    import aiohttp
+    state = make_state(tmp_path)
+    sup = FakeSupervisor(addrs={"192.168.1.87"}, primary="192.168.1.87", mac="02:00:00:00:00:01",
+                         hostname="homeassistant")
+    async with aiohttp.ClientSession() as session:
+        await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
+        assert (state.pi_mac, state.pi_hostname) == ("02:00:00:00:00:01", "homeassistant")
+        sup.mac = sup.hostname = None
+        await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
+    assert (state.pi_mac, state.pi_hostname) == ("02:00:00:00:00:01", "homeassistant")
+    snap = state.snapshot()
+    assert (snap["pi_mac"], snap["pi_hostname"]) == ("02:00:00:00:00:01", "homeassistant")

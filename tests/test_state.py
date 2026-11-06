@@ -359,3 +359,9 @@ async def test_set_address_reserved_results(tmp_path):
     assert s.snapshot()["address_reserved"] is True
     assert s.options.known_devices == ["server.lan"]
 
+
+async def test_update_options_changes_known_status_immediately(tmp_path):
+    s = make_state(tmp_path)
+    assert not (await s.handle_request(req(ip="192.168.1.66"))).known
+    s.update_options(Options(["server.lan", "stranger.lan"], True))
+    assert (await s.handle_request(req(ip="192.168.1.66"))).known

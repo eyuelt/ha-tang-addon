@@ -29,10 +29,12 @@ class Supervisor:
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
 
-    async def network_info(self) -> tuple[set[str] | None, str | None]:
-        """(all Pi addresses, first IPv4 of the primary interface); (None, None) when unknown."""
+    async def network_info(self) -> tuple[set[str] | None, str | None, str | None]:
+        """(all Pi addresses, first IPv4 of the primary interface, that interface's MAC).
+
+        Each part is None when unknown."""
         if self._token is None:
-            return None, None
+            return None, None, None
         try:
             async with self._session.get(f"{self._base}/network/info", headers=self._headers,
                                          timeout=_TIMEOUT) as resp:
@@ -40,6 +42,7 @@ class Supervisor:
                 body = await resp.json()
             out: set[str] = set()
             primary: str | None = None
+            mac: str | None = None
             for iface in body["data"]["interfaces"]:
                 for fam in ("ipv4", "ipv6"):
                     for a in (iface.get(fam) or {}).get("address") or []:
@@ -51,16 +54,35 @@ class Supervisor:
                         ip = canonical_ip(a.split("/", 1)[0])
                         if ip is not None:
                             primary = ip
+                            m = iface.get("mac")
+                            mac = m if isinstance(m, str) and m else None
                             break
         except Exception as e:  # noqa: BLE001 - any failure means "unknown"
             self._fail("network_info", e)
-            return None, None
+            return None, None, None
         self._ok("network_info")
         # No addresses at all (e.g. link down) is "unknown", not "the Pi has no address".
-        return (out or None), primary
+        return (out or None), primary, mac
 
     async def pi_addresses(self) -> set[str] | None:
         return (await self.network_info())[0]
+
+    async def host_name(self) -> str | None:
+        """The Pi's hostname, which it also sends to the router over DHCP; None when unknown."""
+        if self._token is None:
+            return None
+        try:
+            async with self._session.get(f"{self._base}/host/info", headers=self._headers,
+                                         timeout=_TIMEOUT) as resp:
+                resp.raise_for_status()
+                name = (await resp.json())["data"]["hostname"]
+            if not isinstance(name, str) or not name:
+                raise ValueError("hostname missing")
+        except Exception as e:  # noqa: BLE001
+            self._fail("host_name", e)
+            return None
+        self._ok("host_name")
+        return name
 
     async def get_options(self) -> dict | None:
         """The app's own validated options, or None when unknown."""

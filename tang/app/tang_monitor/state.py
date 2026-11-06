@@ -29,6 +29,8 @@ class AppState:
         self.tang_running = False
         self.pi_addresses: set[str] | None = None
         self._primary_hint: str | None = None
+        self.pi_mac: str | None = None  # how to spot the Pi in the router's device list
+        self.pi_hostname: str | None = None
         self.on_forget: Callable[[str], Awaitable[None]] | None = None
         self.on_set_address_reserved: Callable[[bool], Awaitable[bool]] | None = None
         self._mismatches: dict[str, int] = {}  # in memory only; a restart resets the debounce
@@ -39,6 +41,9 @@ class AppState:
     @staticmethod
     def _name_of(entry: LoggedRequest) -> str | None:
         return entry.device if entry.device != entry.request.ip else None
+
+    def update_options(self, options: Options) -> None:
+        self.options = options
 
     async def set_address_reserved(self, value: bool) -> Literal["ok", "unavailable", "failed"]:
         if self.on_set_address_reserved is None:
@@ -175,6 +180,8 @@ class AppState:
         return {
             "running": self.tang_running,
             "primary_address": primary,
+            "pi_mac": self.pi_mac,
+            "pi_hostname": self.pi_hostname,
             "pi_addresses": None if self.pi_addresses is None else sorted(self.pi_addresses),
             "address_reserved": self.options.address_reserved,
             "commands_verified": verified,

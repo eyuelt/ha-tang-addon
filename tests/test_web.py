@@ -32,7 +32,8 @@ async def test_state_json_shape(aiohttp_client, tmp_path):
     r = await c.get("/api/state")
     assert r.status == 200
     j = await r.json()
-    assert set(j) == {"running", "primary_address", "pi_addresses", "address_reserved", "commands_verified",
+    assert set(j) == {"running", "primary_address", "pi_mac", "pi_hostname", "pi_addresses", "address_reserved",
+                      "commands_verified",
                       "keys", "requests", "devices", "known_devices", "test_commands"}
     assert set(j["keys"][0]) == {"use", "s256", "s1"}
     assert set(j["requests"][0]) == {"at", "device", "known", "ip", "host", "kind", "status"}

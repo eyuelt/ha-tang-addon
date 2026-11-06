@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- The reservation banner shows the Pi's MAC address and the name it likely has in your router's device list.
+- Configuration-tab changes apply within about a minute again, with no restart (reverts 0.1.4's restart requirement).
+
 ## 0.1.4
 
 - Configuration-tab changes take effect after restarting the app; the app no longer re-reads its options every
