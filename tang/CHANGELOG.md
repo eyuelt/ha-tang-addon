@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7
+
+- The dashboard no longer shows a stale version after an app update.
+
 ## 0.1.6
 
 - Dashboard and docs no longer assume Home Assistant runs on a Raspberry Pi.

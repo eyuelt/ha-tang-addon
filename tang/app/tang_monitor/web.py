@@ -5,6 +5,8 @@ from pathlib import Path
 from aiohttp import web
 
 STATIC = Path(__file__).parent / "static"
+# Revalidate on every load (a cheap 304 when unchanged) so an app update shows up without a hard refresh.
+NO_CACHE = {"Cache-Control": "no-cache"}
 INGRESS_REMOTES = frozenset({"172.30.32.2", "127.0.0.1", "::1"})
 
 
@@ -16,13 +18,13 @@ def make_app(state, allow_remotes: frozenset[str] = INGRESS_REMOTES) -> web.Appl
         return await handler(request)
 
     async def index(request):
-        return web.FileResponse(STATIC / "index.html")
+        return web.FileResponse(STATIC / "index.html", headers=NO_CACHE)
 
     async def static_file(request):
         path = (STATIC / request.match_info["file"]).resolve()
         if path.parent != STATIC.resolve() or not path.is_file():
             raise web.HTTPNotFound()
-        return web.FileResponse(path)
+        return web.FileResponse(path, headers=NO_CACHE)
 
     async def api_state(request):
         return web.json_response(state.snapshot())

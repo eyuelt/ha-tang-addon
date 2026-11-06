@@ -107,6 +107,9 @@ async def test_index_and_static(aiohttp_client, tmp_path):
     r = await c.get("/")
     assert r.status == 200 and "<html" in await r.text()
     assert (await c.get("/static/app.js")).status == 200
+    # After an app update the browser must not keep running the old dashboard.
+    for path in ("/", "/static/app.js", "/static/style.css"):
+        assert (await c.get(path)).headers.get("Cache-Control") == "no-cache"
     assert (await c.get("/static/../web.py")).status == 404
 
 
