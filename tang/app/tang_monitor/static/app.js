@@ -186,7 +186,7 @@ function renderBanner(s) {
   return h("div", { class: "banner" },
     h("div", {},
       (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router's DHCP " +
-      "settings (often called a DHCP reservation or static lease), then press Mark as reserved. "),
+      "settings (often called a DHCP reservation or static lease), then press Mark as reserved."),
     h("div", { class: "row" },
       h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
         : { type: "button", onclick: markReserved }, "Mark as reserved"),
@@ -288,7 +288,8 @@ async function refresh() {
     if (text === lastText || selecting) return;
     lastText = text;
     lastState = JSON.parse(text);
-    render(lastState);
+    // Don't rebuild the banner mid-fade (a new element would jump to transparent); the fade's end timer re-renders.
+    if (reserveConfirm !== "fading") render(lastState);
   } catch (e) {
     const app = document.getElementById("app");
     if (!lastState) app.replaceChildren(h("p", { class: "err" }, "Could not load state: " + e));
