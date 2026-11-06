@@ -62,6 +62,37 @@ class Supervisor:
     async def pi_addresses(self) -> set[str] | None:
         return (await self.network_info())[0]
 
+    async def get_options(self) -> dict | None:
+        """The app's own validated options, or None when unknown."""
+        if self._token is None:
+            return None
+        try:
+            async with self._session.get(f"{self._base}/addons/self/options/config",
+                                         headers=self._headers, timeout=_TIMEOUT) as resp:
+                resp.raise_for_status()
+                data = (await resp.json())["data"]
+            if not isinstance(data, dict):
+                raise ValueError("options data is not an object")
+        except Exception as e:  # noqa: BLE001
+            self._fail("get_options", e)
+            return None
+        self._ok("get_options")
+        return data
+
+    async def set_options(self, options: dict) -> bool:
+        """Write the COMPLETE options dict (merge behaviour is undocumented)."""
+        if self._token is None:
+            return False
+        try:
+            async with self._session.post(f"{self._base}/addons/self/options", json={"options": options},
+                                          headers=self._headers, timeout=_TIMEOUT) as resp:
+                resp.raise_for_status()
+        except Exception as e:  # noqa: BLE001
+            self._fail("set_options", e)
+            return False
+        self._ok("set_options")
+        return True
+
     async def _post(self, kind: str, path: str, body: dict) -> None:
         if self._token is None:
             return

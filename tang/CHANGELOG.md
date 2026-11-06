@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3
+
+- Mark as reserved button on the reminder banner (sets the Address reserved option).
+- Option changes now apply within a minute without a restart.
+
 ## 0.1.2
 
 - App icon, and a working sidebar icon (the previous one didn't exist).

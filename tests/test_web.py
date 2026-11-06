@@ -112,3 +112,27 @@ async def test_index_and_static(aiohttp_client, tmp_path):
 def test_index_uses_relative_api_url():
     js = (Path(__file__).parent.parent / "tang/app/tang_monitor/static/app.js").read_text()
     assert 'fetch("api/state"' in js
+
+
+async def test_address_reserved_route(aiohttp_client, tmp_path):
+    s, c = await make_client(aiohttp_client, tmp_path)
+    r = await c.post("/api/address-reserved", json={"reserved": True})
+    assert r.status == 503
+    assert (await r.json()) == {"error": "Home Assistant isn't reachable from the app right now."}
+
+    async def no(v):
+        return False
+    s.on_set_address_reserved = no
+    r = await c.post("/api/address-reserved", json={"reserved": True})
+    assert r.status == 502
+    assert (await r.json()) == {"error": "Home Assistant didn't accept the change."}
+
+    async def yes(v):
+        return True
+    s.on_set_address_reserved = yes
+    r = await c.post("/api/address-reserved", json={"reserved": False})
+    assert r.status == 200 and (await r.json()) == {"address_reserved": False}
+
+    for body in ({"reserved": "yes"}, {"x": 1}, [True], 5):
+        assert (await c.post("/api/address-reserved", json=body)).status == 400
+    assert (await c.post("/api/address-reserved", data="not json")).status == 400

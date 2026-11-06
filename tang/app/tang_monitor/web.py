@@ -53,6 +53,21 @@ def make_app(state, allow_remotes: frozenset[str] = INGRESS_REMOTES) -> web.Appl
             raise web.HTTPConflict()
         return web.json_response({"ok": True})
 
+    async def address_reserved(request):
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - any unparseable body is a bad request
+            raise web.HTTPBadRequest()
+        if not isinstance(body, dict) or not isinstance(body.get("reserved"), bool):
+            raise web.HTTPBadRequest()
+        result = await state.set_address_reserved(body["reserved"])
+        if result == "unavailable":
+            return web.json_response({"error": "Home Assistant isn't reachable from the app right now."},
+                                     status=503)
+        if result == "failed":
+            return web.json_response({"error": "Home Assistant didn't accept the change."}, status=502)
+        return web.json_response({"address_reserved": body["reserved"]})
+
     app = web.Application(middlewares=[only_ingress])
     app.add_routes([
         web.get("/", index),
@@ -61,6 +76,7 @@ def make_app(state, allow_remotes: frozenset[str] = INGRESS_REMOTES) -> web.Appl
         web.post("/api/devices/{device}/fixed", fixed),
         web.post("/api/devices/{device}/forget", forget),
         web.post("/api/devices/{device}/known", known),
+        web.post("/api/address-reserved", address_reserved),
     ])
     return app
 
@@ -97,6 +113,9 @@ def _demo_state():
         for at, ip, host, kind, status in sample:
             await s.handle_request(TangRequest(at, ip, host, kind, status))
     asyncio.run(feed())
+    async def demo_reserve(value: bool) -> bool:
+        return True
+    s.on_set_address_reserved = demo_reserve
     s.tang_running = True
     for _ in range(3):  # the flag needs 3 consecutive mismatching checks
         s.set_pi_addresses({"192.168.1.112"}, primary="192.168.1.112")

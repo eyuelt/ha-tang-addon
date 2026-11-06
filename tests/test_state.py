@@ -5,7 +5,7 @@ import pytest
 from tang_monitor import commands
 from tang_monitor.keys import KeyInfo
 from tang_monitor.naming import Namer
-from tang_monitor.options import Options, load_options
+from tang_monitor.options import Options, load_options, options_from_dict
 from tang_monitor.records import TangRequest
 from tang_monitor.state import AppState
 
@@ -331,3 +331,37 @@ def test_load_options_ignores_blank_entries(tmp_path):
     p = tmp_path / "o.json"
     p.write_text('{"known_devices": ["x", "", "  "]}')
     assert load_options(p).known_devices == ["x"]
+
+
+def test_options_from_dict_defaults_and_blank_dropping():
+    assert options_from_dict({}) == Options([], False)
+    assert options_from_dict("nope") == Options([], False)
+    assert options_from_dict({"known_devices": "x"}) == Options([], False)
+    assert options_from_dict({"known_devices": ["a", " ", ""], "address_reserved": True}) == Options(["a"], True)
+
+
+async def test_set_address_reserved_results(tmp_path):
+    s = make_state(tmp_path, reserved=False)
+    assert await s.set_address_reserved(True) == "unavailable"
+
+    async def no(v):
+        return False
+
+    s.on_set_address_reserved = no
+    assert await s.set_address_reserved(True) == "failed"
+    assert s.snapshot()["address_reserved"] is False
+
+    async def yes(v):
+        return True
+
+    s.on_set_address_reserved = yes
+    assert await s.set_address_reserved(True) == "ok"
+    assert s.snapshot()["address_reserved"] is True
+    assert s.options.known_devices == ["server.lan"]
+
+
+async def test_update_options_changes_known_status_immediately(tmp_path):
+    s = make_state(tmp_path)
+    assert not (await s.handle_request(req(ip="192.168.1.66"))).known
+    s.update_options(Options(["server.lan", "stranger.lan"], True))
+    assert (await s.handle_request(req(ip="192.168.1.66"))).known

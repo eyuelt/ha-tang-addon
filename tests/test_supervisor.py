@@ -5,8 +5,10 @@ from tang_monitor.supervisor import Supervisor
 NET = {"data": {"interfaces": [{"ipv4": {"address": ["192.168.1.87/24"]},
                                 "ipv6": {"address": ["fe80::1/64"]}}]}}
 
+OPTS = {"result": "ok", "data": {"known_devices": ["server.lan"], "address_reserved": False}}
 
-async def make(aiohttp_client, status=200):
+
+async def make(aiohttp_client, status=200, opts_body=OPTS):
     seen = []
 
     async def net(request):
@@ -26,6 +28,16 @@ async def make(aiohttp_client, status=200):
         return web.json_response({}, status=status)
     app.router.add_delete("/core/api/states/{eid}", delete)
     app.router.add_post("/core/api/events/{ev}", post)
+
+    async def get_opts(request):
+        seen.append(("GET", request.path, request.headers.get("Authorization"), None))
+        return web.json_response(opts_body, status=status)
+
+    async def set_opts(request):
+        seen.append(("POST", request.path, request.headers.get("Authorization"), await request.json()))
+        return web.json_response({"result": "ok"}, status=status)
+    app.router.add_get("/addons/self/options/config", get_opts)
+    app.router.add_post("/addons/self/options", set_opts)
     client = await aiohttp_client(app)
     return client, seen
 
@@ -134,3 +146,42 @@ async def test_remove_state_noop_without_token_and_never_raises(aiohttp_client):
     await Supervisor(client.session, "tok", base="http://127.0.0.1:1").remove_state("sensor.x")
     client2, _ = await make(aiohttp_client, status=500)
     await Supervisor(client2.session, "tok", base=str(client2.make_url("")).rstrip("/")).remove_state("sensor.x")
+
+
+def _sup(client, token="tok"):
+    return Supervisor(client.session, token, base=str(client.make_url("")).rstrip("/"))
+
+
+async def test_get_options_returns_data_with_bearer(aiohttp_client):
+    client, seen = await make(aiohttp_client)
+    assert await _sup(client).get_options() == OPTS["data"]
+    assert seen[0] == ("GET", "/addons/self/options/config", "Bearer tok", None)
+
+
+async def test_get_options_none_on_bad_data_error_or_no_token(aiohttp_client):
+    client, _ = await make(aiohttp_client, opts_body={"data": ["x"]})
+    assert await _sup(client).get_options() is None
+    client, _ = await make(aiohttp_client, status=500)
+    assert await _sup(client).get_options() is None
+    client, seen = await make(aiohttp_client)
+    assert await _sup(client, None).get_options() is None
+    assert seen == []
+
+
+async def test_set_options_posts_full_dict(aiohttp_client):
+    client, seen = await make(aiohttp_client)
+    new = {"known_devices": ["server.lan"], "address_reserved": True}
+    assert await _sup(client).set_options(new) is True
+    assert seen[0] == ("POST", "/addons/self/options", "Bearer tok", {"options": new})
+
+
+async def test_set_options_false_on_errors_or_no_token(aiohttp_client):
+    for status in (400, 500):
+        client, _ = await make(aiohttp_client, status=status)
+        assert await _sup(client).set_options({"a": 1}) is False
+    client, seen = await make(aiohttp_client)
+    assert await _sup(client, None).set_options({"a": 1}) is False
+    assert seen == []
+    dead = Supervisor(client.session, "tok", base="http://127.0.0.1:1")
+    assert await dead.set_options({"a": 1}) is False
+    assert await dead.get_options() is None

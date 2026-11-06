@@ -30,6 +30,7 @@ class AppState:
         self.pi_addresses: set[str] | None = None
         self._primary_hint: str | None = None
         self.on_forget: Callable[[str], Awaitable[None]] | None = None
+        self.on_set_address_reserved: Callable[[bool], Awaitable[bool]] | None = None
         self._mismatches: dict[str, int] = {}  # in memory only; a restart resets the debounce
         self.log = RequestLog(data_dir / "requests.json")
         self.store = DeviceStore(data_dir / "devices.json")
@@ -38,6 +39,17 @@ class AppState:
     @staticmethod
     def _name_of(entry: LoggedRequest) -> str | None:
         return entry.device if entry.device != entry.request.ip else None
+
+    def update_options(self, options: Options) -> None:
+        self.options = options
+
+    async def set_address_reserved(self, value: bool) -> Literal["ok", "unavailable", "failed"]:
+        if self.on_set_address_reserved is None:
+            return "unavailable"
+        if not await self.on_set_address_reserved(value):
+            return "failed"
+        self.options = replace(self.options, address_reserved=value)
+        return "ok"
 
     def is_known(self, name: str | None, ip: str) -> bool:
         return is_known_request(name, ip, self.options.known_devices) or self.known.matches(name, ip)

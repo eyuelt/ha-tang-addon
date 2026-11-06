@@ -6,6 +6,13 @@ let lastState = null;
 let lastText = null;
 let pendingForget = null;  // device id awaiting the inline "Forget? Yes / Cancel" confirmation
 let forgetNote = null;
+// Reservation banner state lives at module level so the 10-second poll's re-render can't cut the
+// confirmation short or bring the yellow banner back.
+let reserveSaving = false;
+let reserveError = null;
+let reserveConfirm = null;  // null | "shown" | "fading"
+const CONFIRM_MS = 4000;
+const FADE_MS = 1000;
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -135,13 +142,57 @@ function renderStatus(s) {
     h("span", {}, s.keys.length + (s.keys.length === 1 ? " key" : " keys")));
 }
 
+async function markReserved() {
+  reserveSaving = true;
+  reserveError = null;
+  render(lastState);
+  try {
+    const r = await fetch("api/address-reserved", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reserved: true }) });
+    if (r.ok) {
+      reserveSaving = false;
+      reserveConfirm = "shown";
+      lastState = { ...lastState, address_reserved: true };
+      lastText = null;
+      render(lastState);
+      setTimeout(startFade, CONFIRM_MS);
+      refresh();
+      return;
+    }
+    let msg = "Request failed: " + r.status;
+    try { const j = await r.json(); if (j && j.error) msg = j.error; } catch (e) { /* keep status text */ }
+    reserveError = msg;
+  } catch (e) {
+    reserveError = "Request failed: " + e;
+  }
+  reserveSaving = false;
+  render(lastState);
+}
+
+function startFade() {
+  reserveConfirm = "fading";
+  const el = document.querySelector(".banner.ok");
+  if (el) el.classList.add("fade");
+  setTimeout(() => { reserveConfirm = null; render(lastState); }, FADE_MS);
+}
+
 function renderBanner(s) {
+  if (reserveConfirm) {
+    return h("div", { class: "banner ok" + (reserveConfirm === "fading" ? " fade" : "") },
+      "✓ Address marked as reserved. You can change this anytime in this app's Configuration.");
+  }
   if (s.address_reserved) return null;
   const addr = s.primary_address;
   return h("div", { class: "banner" },
-    (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router's DHCP " +
-    "settings (often called a DHCP reservation or static lease), then turn on 'Address reserved' in this " +
-    "add-on's settings.");
+    h("div", {},
+      (addr ? "Reserve " + addr + " for this Pi" : "Reserve this Pi's address") + " in your router's DHCP " +
+      "settings (often called a DHCP reservation or static lease), then press Mark as reserved. "),
+    h("div", { class: "row" },
+      h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
+        : { type: "button", onclick: markReserved }, "Mark as reserved"),
+      reserveSaving && h("span", {}, "Saving…")),
+    reserveError && h("div", { class: "err" }, reserveError + " You can also turn on Address reserved in this " +
+      "app's Configuration."));
 }
 
 function renderAlerts(s) {

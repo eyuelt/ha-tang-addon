@@ -11,7 +11,7 @@ from aiohttp import web
 from .entities import build_entities, device_slug, event_data
 from .keys import ensure_keys, load_keys
 from .naming import Namer
-from .options import load_options
+from .options import load_options, options_from_dict
 from .records import TangRequest
 from .state import AppState
 from .supervisor import Supervisor
@@ -47,6 +47,15 @@ def make_on_request(state: AppState, sup: Supervisor):
     return on_request
 
 
+def make_set_address_reserved(sup: Supervisor):
+    async def set_address_reserved(value: bool) -> bool:
+        current = await sup.get_options()
+        if current is None:
+            return False
+        return await sup.set_options({**current, "address_reserved": value})
+    return set_address_reserved
+
+
 async def tang_healthy(session: aiohttp.ClientSession, url: str) -> bool:
     try:
         async with session.get(url, timeout=_HEALTH_TIMEOUT) as resp:
@@ -63,6 +72,9 @@ async def refresh(state: AppState, sup: Supervisor, session: aiohttp.ClientSessi
         log.info("Tang is %s", "running" if running else "NOT running")
     state.tang_running = running
     state.set_pi_addresses(*await sup.network_info())
+    options = await sup.get_options()
+    if options is not None:
+        state.update_options(options_from_dict(options))
     await publish(state, sup)
 
 
@@ -93,6 +105,7 @@ async def main(data_dir: Path = DATA_DIR) -> None:
         async def on_forget(device: str) -> None:
             await sup.remove_state(f"binary_sensor.tang_{device_slug(device)}_address_ok")
         state.on_forget = on_forget
+        state.on_set_address_reserved = make_set_address_reserved(sup)
         tang = await start_tang_server("0.0.0.0", TANG_PORT, keydir, make_on_request(state, sup))
         runner = web.AppRunner(make_app(state), access_log=None)
         await runner.setup()

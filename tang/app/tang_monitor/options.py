@@ -11,11 +11,14 @@ class Options:
     address_reserved: bool = False
 
 
-def load_options(path: Path = Path("/data/options.json")) -> Options:
-    raw = jsonfile.load(path, {})
+def options_from_dict(raw: object) -> Options:
     if not isinstance(raw, dict):
         raw = {}
     known = raw.get("known_devices", [])
     if not isinstance(known, list):
         known = []
     return Options([str(k) for k in known if str(k).strip()], bool(raw.get("address_reserved", False)))
+
+
+def load_options(path: Path = Path("/data/options.json")) -> Options:
+    return options_from_dict(jsonfile.load(path, {}))

@@ -17,7 +17,10 @@ KEYS = [KeyInfo("a", "signing", "S256A", "S1A"), KeyInfo("b", "exchange", "S256B
 
 
 class FakeSupervisor:
-    def __init__(self, addrs=None, fail=(), primary=None):
+    def __init__(self, addrs=None, fail=(), primary=None, options=None):
+        self.options = options
+        self.set_calls: list[dict] = []
+        self.set_ok = True
         self.addrs = addrs
         self.primary = primary
         self.removed: list[str] = []
@@ -29,6 +32,13 @@ class FakeSupervisor:
         if "pi_addresses" in self.fail:
             raise RuntimeError("boom")
         return self.addrs, self.primary
+
+    async def get_options(self):
+        return self.options
+
+    async def set_options(self, options):
+        self.set_calls.append(options)
+        return self.set_ok
 
     async def remove_state(self, entity_id):
         self.removed.append(entity_id)
@@ -128,3 +138,31 @@ async def test_refresh_loop_survives_a_failing_iteration(tmp_path, caplog):
             await main.refresh_loop(None, None, None, "x", interval=0, refresh_fn=flaky)
     assert len(calls) == 3
     assert "refresh failed" in caplog.text
+
+
+async def test_refresh_applies_options_from_supervisor(tmp_path):
+    import aiohttp
+    state = make_state(tmp_path)
+    sup = FakeSupervisor(options={"known_devices": ["a.lan", " "], "address_reserved": True})
+    async with aiohttp.ClientSession() as session:
+        await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
+    assert state.options == Options(["a.lan"], True)
+
+
+async def test_refresh_keeps_options_when_supervisor_returns_none(tmp_path):
+    import aiohttp
+    state = make_state(tmp_path)
+    async with aiohttp.ClientSession() as session:
+        await main.refresh(state, FakeSupervisor(options=None), session, "http://127.0.0.1:1/adv")
+    assert state.options == Options(["server.lan"], False)
+
+
+async def test_set_reserved_callback_sends_full_merged_dict(tmp_path):
+    state = make_state(tmp_path)
+    sup = FakeSupervisor(options={"known_devices": ["x.lan"], "address_reserved": False, "other": 1})
+    cb = main.make_set_address_reserved(sup)
+    assert await cb(True) is True
+    assert sup.set_calls == [{"known_devices": ["x.lan"], "address_reserved": True, "other": 1}]
+    sup.options = None
+    assert await cb(True) is False
+    assert len(sup.set_calls) == 1

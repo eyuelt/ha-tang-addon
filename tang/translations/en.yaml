@@ -3,11 +3,12 @@ configuration:
     name: Known devices
     description: >-
       Optional. Names of the devices you bind to this Tang server, as your router reports them (for example
-      server.lan). You can also mark devices as known from the dashboard, without a restart. Requests from any other
-      device are marked unknown.
+      server.lan). You can also mark devices as known from the dashboard. Changes apply within a minute, with no restart.
+      Requests from any other device are marked unknown.
   address_reserved:
     name: Address reserved
     description: >-
-      Turn on once you have reserved this Pi's IP address in your router. This hides the reservation reminder.
+      Turn on once you have reserved this Pi's IP address in your router. The
+      dashboard's Mark as reserved button sets this for you. Hides the reservation reminder.
 network:
   7500/tcp: Tang (home network only)
