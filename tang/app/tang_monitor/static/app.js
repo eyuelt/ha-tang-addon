@@ -197,9 +197,11 @@ function renderDevices(s) {
   const body = rows.length ? rows.map(({ device, rec }) => h("div", { class: "cmd" },
     h("div", { style: "flex:1" },
       h("strong", {}, device),
-      rec ? [" via ", h("code", {}, rec.last_ok_address), ", " + fmtTime(rec.last_ok_at) +
-        ", " + (rec.flag === "none" ? "ok" : rec.flag === "flagged" ? "needs fixing" : "fixed, untested")]
-        : ", known, not seen yet"),
+      rec ? [...(rec.last_ip ? [" (", h("code", {}, rec.last_ip), ")"] : []),
+        " · reaches Tang at ", h("code", {}, rec.last_ok_address),
+        " · last seen " + fmtTime(rec.last_ok_at) +
+        " · " + (rec.flag === "none" ? "OK" : rec.flag === "flagged" ? "needs fixing" : "fixed, not yet tested")]
+        : " · known, not seen yet"),
     forgetControl(device)))
     : h("span", { class: "muted" }, "No devices tracked yet.");
   const note = forgetNote && h("p", { class: "muted" }, forgetNote +

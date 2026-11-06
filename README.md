@@ -18,3 +18,7 @@ Tang must only be reachable from your home network. Do not port-forward port 750
 ## Documentation
 
 See [tang/DOCS.md](tang/DOCS.md) for setup and usage.
+
+## Credits
+
+The icon is `key-wireless` from [Material Design Icons](https://pictogrammers.com/library/mdi/) (Apache License 2.0).

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- App icon, and a working sidebar icon (the previous one didn't exist).
+- Devices list: shows each device's own address, and labels the Pi address it reaches Tang at.
+
 ## 0.1.1
 
 - Mark devices as known, or forget them, from the dashboard; no restart needed.

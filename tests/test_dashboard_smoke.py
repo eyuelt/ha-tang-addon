@@ -58,3 +58,5 @@ def test_demo_dashboard_renders_real_dom(demo_url, tmp_path):
     assert "&lt;b&gt;stranger" in out  # untrusted name escaped, not injected as markup
     assert ">Mark as known<" in out  # on the unknown row
     assert "desktop.lan" in out and "known, not seen yet" in out  # known device with no record
+    # Devices row: own address in parentheses, then the Pi address it reaches Tang at, labelled.
+    assert "reaches Tang at" in out and "last seen" in out and " via <code>" not in out

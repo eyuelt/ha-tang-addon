@@ -41,6 +41,17 @@ async def test_success_from_known_device_records_address(tmp_path):
     assert snap["requests"][0]["device"] == "server.lan"
 
 
+async def test_device_row_carries_the_devices_own_last_ip(tmp_path):
+    # The Devices row shows the device's own address separately from the Pi address it reaches Tang at.
+    s = AppState(tmp_path, Options(["server.lan"], True), KEYS,
+                 Namer(lookup={"192.168.1.50": "server.lan", "192.168.1.51": "server.lan"}.get))
+    await s.handle_request(req(ip="192.168.1.50"))
+    await s.handle_request(req(ip="192.168.1.51", status=404))  # newest request, even a failed one
+    d = s.snapshot()["devices"][0]
+    assert d["last_ip"] == "192.168.1.51"
+    assert d["last_ok_address"] == "192.168.1.87"
+
+
 async def test_unknown_device_logged_not_tracked(tmp_path):
     s = make_state(tmp_path)
     entry = await s.handle_request(req(ip="192.168.1.66"))

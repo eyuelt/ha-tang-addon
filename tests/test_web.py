@@ -36,7 +36,7 @@ async def test_state_json_shape(aiohttp_client, tmp_path):
                       "keys", "requests", "devices", "known_devices", "test_commands"}
     assert set(j["keys"][0]) == {"use", "s256", "s1"}
     assert set(j["requests"][0]) == {"at", "device", "known", "ip", "host", "kind", "status"}
-    assert set(j["devices"][0]) == {"device", "last_ok_address", "last_ok_at", "flag",
+    assert set(j["devices"][0]) == {"device", "last_ip", "last_ok_address", "last_ok_at", "flag",
                                     "address_ok", "commands"}
 
 

@@ -144,13 +144,17 @@ class AppState:
         primary = self.primary_address()
         can_cmd = verified and primary is not None and self._has_signing()
         exchange = [k for k in self.keys if k.use == "exchange"]
+        recent = self.log.recent()
+        last_ip: dict[str, str] = {}
+        for e in recent:  # newest first, so the first entry per device is its latest request
+            last_ip.setdefault(e.device, e.request.ip)
         devices = []
         for r in self.store.all():
             cmds = None
             if can_cmd and r.flag != "none":
                 cmds = commands.device_commands(r.last_ok_address, primary, self.port, self.keys)
             devices.append({
-                "device": r.device, "last_ok_address": r.last_ok_address,
+                "device": r.device, "last_ip": last_ip.get(r.device), "last_ok_address": r.last_ok_address,
                 "last_ok_at": r.last_ok_at.isoformat(), "flag": r.flag,
                 "address_ok": address_ok(r, self.pi_addresses), "commands": cmds})
         test_commands = None
@@ -168,7 +172,7 @@ class AppState:
             "keys": [{"use": k.use, "s256": k.s256, "s1": k.s1} for k in self.keys],
             "requests": [{"at": e.request.at.isoformat(), "device": e.device, "known": self.is_known(self._name_of(e), e.request.ip),
                           "ip": e.request.ip, "host": e.request.host, "kind": e.request.kind,
-                          "status": e.request.status} for e in self.log.recent()],
+                          "status": e.request.status} for e in recent],
             "devices": devices,
             "known_devices": self._known_devices(),
             "test_commands": test_commands,
