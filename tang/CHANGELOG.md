@@ -3,8 +3,9 @@
 ## 0.1.7
 
 - The dashboard no longer shows a stale version after an app update.
-- Reservation banner: button beside the text on wide windows (full width below it on narrow ones), spacing
-  between paragraphs, and a bold MAC address and name that no longer break mid-word.
+- Banners (reservation reminder and address-change alerts) share one layout: button beside the text on wide
+  windows, full width below it on narrow ones, spacing between paragraphs, and bold addresses, MACs and names
+  that no longer break mid-word.
 
 ## 0.1.6
 

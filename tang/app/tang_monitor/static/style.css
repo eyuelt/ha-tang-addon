@@ -20,23 +20,26 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: v
 .status { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
 .status .up { color: var(--ok); font-weight: 600; }
 .status .down { color: var(--bad-fg); font-weight: 600; }
-.banner { background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
-.banner p { margin: 0; }
-.banner p + p { margin-top: 8px; }
-.banner code { font-weight: 700; word-break: normal; white-space: nowrap; }  /* MACs and names stay whole */
+/* Banners (see banner() in app.js): text left, actions right and vertically centered; on narrow windows the
+   actions become full width under the text. */
+.banner { border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.banner.warn { background: var(--warn-bg); color: var(--warn-fg); }
+.banner.bad { background: var(--bad-bg); color: var(--bad-fg); }
+.banner.ok { background: var(--ok-bg); color: var(--ok-fg); opacity: 1; transition: opacity 1s ease-out; }
+.banner.ok.fade { opacity: 0; }
+.banner .text p { margin: 0; }
+.banner .text p + p { margin-top: 8px; }
+/* Addresses, MACs and names: bold, and never split mid-word. */
+.banner .text code { font-weight: 700; word-break: normal; white-space: nowrap; }
 .banner .side { display: flex; gap: 10px 20px; align-items: center; }
 .banner .side .text { flex: 1; }
 .banner .actions { display: flex; gap: 10px; align-items: center; }
 .banner .actions button { white-space: nowrap; }
+.banner details { color: var(--fg); margin-top: 8px; }
 @media (max-width: 600px) {
   .banner .side { flex-direction: column; align-items: stretch; }
   .banner .actions { flex-direction: column; align-items: stretch; text-align: center; gap: 6px; }
 }
-.banner.ok { background: var(--ok-bg); color: var(--ok-fg); opacity: 1; transition: opacity 1s ease-out; }
-.banner.ok.fade { opacity: 0; }
-.alert { background: var(--bad-bg); color: var(--bad-fg); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
-.alert .row { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
-.alert details { color: var(--fg); margin-top: 8px; }
 details { margin-top: 6px; }
 details details { margin-left: 12px; }
 summary { cursor: pointer; font-weight: 600; }

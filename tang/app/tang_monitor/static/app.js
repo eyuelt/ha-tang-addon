@@ -187,43 +187,52 @@ function findPiHint(s) {
   return ["In your router's device list, it's probably named ", name, "."];
 }
 
+// Every banner uses this layout: paragraphs on the left and actions on the right, vertically centered; on
+// narrow windows the actions become full width under the text (style.css). `below` spans the full width
+// underneath (e.g. "How to fix"). kind: "warn" | "bad" | "ok". A paragraph is a string, an array of parts,
+// or a ready-made element.
+function banner(kind, paras, actions, ...below) {
+  const acts = (actions || []).filter(Boolean);
+  const ps = paras.filter(Boolean).map(p => p instanceof Node ? p : h("p", {}, p));
+  return h("div", { class: "banner " + kind },
+    h("div", { class: "side" },
+      h("div", { class: "text" }, ...ps),
+      acts.length > 0 && h("div", { class: "actions" }, ...acts)),
+    ...below);
+}
+
 function renderBanner(s) {
   if (reserveConfirm) {
-    return h("div", { class: "banner ok" + (reserveConfirm === "fading" ? " fade" : "") },
-      "✓ Address marked as reserved. You can change this anytime in this app's Configuration.");
+    return banner("ok" + (reserveConfirm === "fading" ? " fade" : ""),
+      ["✓ Address marked as reserved. You can change this anytime in this app's Configuration."]);
   }
   if (s.address_reserved) return null;
   const addr = s.primary_address;
-  // Wide windows: text on the left, button centered on the right. Narrow: full-width button below (style.css).
-  return h("div", { class: "banner" },
-    h("div", { class: "side" },
-      h("div", { class: "text" },
-        h("p", {},
-          (addr ? "Reserve " + addr + " for this Home Assistant machine"
-            : "Reserve this Home Assistant machine's address") +
-          " in your router's DHCP settings (often called a DHCP reservation or static lease), then press " +
-          "“Mark as reserved”."),
-        (s.pi_mac || s.pi_hostname) && h("p", {}, ...findPiHint(s)),
-        reserveError && h("p", { class: "err" }, reserveError + " You can also turn on Address reserved in this " +
-          "app's Configuration.")),
-      h("div", { class: "actions" },
-        h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
-          : { type: "button", onclick: markReserved }, "Mark as reserved"),
-        reserveSaving && h("span", {}, "Saving…"))));
+  return banner("warn", [
+    [...(addr ? ["Reserve ", h("code", {}, addr), " for this Home Assistant machine"]
+      : ["Reserve this Home Assistant machine's address"]),
+     " in your router's DHCP settings (often called a DHCP reservation or static lease), then press " +
+     "“Mark as reserved”."],
+    (s.pi_mac || s.pi_hostname) && findPiHint(s),
+    reserveError && h("p", { class: "err" }, reserveError + " You can also turn on Address reserved in this " +
+      "app's Configuration."),
+  ], [
+    h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
+      : { type: "button", onclick: markReserved }, "Mark as reserved"),
+    reserveSaving && h("span", {}, "Saving…"),
+  ]);
 }
 
 function renderAlerts(s) {
   return s.devices.filter(d => d.flag !== "none").map(d => {
-    const piAddr = s.primary_address || "a different address";
+    const piAddr = s.primary_address ? h("code", {}, s.primary_address) : "a different address";
     const line = d.flag === "fixed_untested"
       ? "Marked fixed, not yet tested. Run the test below, or restart " + d.device + "."
-      : d.device + " unlocks via " + d.last_ok_address + ", but Home Assistant is now at " + piAddr +
-        ". It will show the password prompt at boot until this is fixed.";
+      : [d.device + " unlocks via ", h("code", {}, d.last_ok_address), ", but Home Assistant is now at ", piAddr,
+        ". It will show the password prompt at boot until this is fixed."];
     const fixedBtn = d.flag === "flagged" && h("button", { type: "button",
       onclick: () => post("api/devices/" + encodeURIComponent(d.device) + "/fixed") }, "I've fixed it");
-    return h("div", { class: "alert" },
-      h("div", { class: "row" }, h("span", {}, line), fixedBtn),
-      d.commands && fixDetails(d, d.commands));
+    return banner("bad", [line], [fixedBtn], d.commands && fixDetails(d, d.commands));
   });
 }
 

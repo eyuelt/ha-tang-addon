@@ -54,14 +54,18 @@ def test_demo_dashboard_renders_real_dom(demo_url, tmp_path):
     assert not re.search(r"(^|>)\s*null\s*(<|$)", out, re.M)  # a stray "null" text node
     assert ">When<" in out and ">Who<" in out and ">Result<" in out
     assert "How to fix" in out
-    assert "Reserve 192.168.1.112" in out
+    assert "Reserve <code>192.168.1.112</code>" in out  # addresses are bold (.banner .text code)
     assert "&lt;b&gt;stranger" in out  # untrusted name escaped, not injected as markup
     assert ">Mark as reserved<" in out  # the reservation banner button
     assert "then press “Mark as reserved”." in out
+    # Every banner shares one layout: text, then actions on the right.
+    assert 'class="banner warn"' in out and 'class="banner bad"' in out and 'class="alert' not in out
+    assert re.search(r'class="banner bad">.*?<div class="actions"><button[^>]*>I\'ve fixed it<', out, re.S)
+    assert "unlocks via <code>192.168.1.87</code>, but Home Assistant is now at <code>192.168.1.112</code>" in out
     assert '<code>02:00:00:00:00:01</code>' in out  # bold via .banner code, kept on one line
     assert "for this Home Assistant machine" in out and "this Pi" not in out
     assert "02:00:00:00:00:01" in out and "homeassistant" in out  # how to spot this machine in the router's list
     assert ">Mark as known<" in out  # on the unknown row
     assert "desktop.lan" in out and "known, not seen yet" in out  # known device with no record
     # Devices row: own address in parentheses, then the address it reaches Tang at, labelled.
-    assert "reaches Tang at" in out and "last seen" in out and " via <code>" not in out
+    assert "reaches Tang at" in out and "last seen" in out and not re.search(r"\.lan via <code>", out)
