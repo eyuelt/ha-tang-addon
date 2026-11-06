@@ -140,20 +140,13 @@ async def test_refresh_loop_survives_a_failing_iteration(tmp_path, caplog):
     assert "refresh failed" in caplog.text
 
 
-async def test_refresh_applies_options_from_supervisor(tmp_path):
+async def test_refresh_does_not_reload_options(tmp_path):
+    # Configuration-tab edits take effect on restart; only dashboard actions change options live.
     import aiohttp
     state = make_state(tmp_path)
-    sup = FakeSupervisor(options={"known_devices": ["a.lan", " "], "address_reserved": True})
+    sup = FakeSupervisor(options={"known_devices": ["a.lan"], "address_reserved": True})
     async with aiohttp.ClientSession() as session:
         await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
-    assert state.options == Options(["a.lan"], True)
-
-
-async def test_refresh_keeps_options_when_supervisor_returns_none(tmp_path):
-    import aiohttp
-    state = make_state(tmp_path)
-    async with aiohttp.ClientSession() as session:
-        await main.refresh(state, FakeSupervisor(options=None), session, "http://127.0.0.1:1/adv")
     assert state.options == Options(["server.lan"], False)
 
 

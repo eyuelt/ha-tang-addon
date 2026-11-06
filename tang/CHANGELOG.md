@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- Configuration-tab changes take effect after restarting the app; the app no longer re-reads its options every
+  minute. Dashboard actions (Mark as reserved, Mark as known, Forget) still apply immediately.
+
 ## 0.1.3
 
 - Mark as reserved button on the reminder banner (sets the Address reserved option).

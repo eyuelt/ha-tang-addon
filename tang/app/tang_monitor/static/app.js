@@ -192,7 +192,7 @@ function renderBanner(s) {
         : { type: "button", onclick: markReserved }, "Mark as reserved"),
       reserveSaving && h("span", {}, "Saving…")),
     reserveError && h("div", { class: "err" }, reserveError + " You can also turn on Address reserved in this " +
-      "app's Configuration."));
+      "app's Configuration, then restart the app."));
 }
 
 function renderAlerts(s) {
@@ -256,7 +256,8 @@ function renderDevices(s) {
     forgetControl(device)))
     : h("span", { class: "muted" }, "No devices tracked yet.");
   const note = forgetNote && h("p", { class: "muted" }, forgetNote +
-    " is also listed in this app's Configuration (Known devices). Remove it there to stop treating it as known.");
+    " is also listed in this app's Configuration (Known devices). Remove it there and restart the app to stop " +
+    "treating it as known.");
   return [h("h2", {}, "Devices"), h("div", { class: "card" }, body, note)];
 }
 

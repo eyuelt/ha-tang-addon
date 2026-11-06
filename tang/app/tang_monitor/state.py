@@ -40,9 +40,6 @@ class AppState:
     def _name_of(entry: LoggedRequest) -> str | None:
         return entry.device if entry.device != entry.request.ip else None
 
-    def update_options(self, options: Options) -> None:
-        self.options = options
-
     async def set_address_reserved(self, value: bool) -> Literal["ok", "unavailable", "failed"]:
         if self.on_set_address_reserved is None:
             return "unavailable"
