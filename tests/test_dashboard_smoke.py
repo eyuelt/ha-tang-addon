@@ -57,6 +57,8 @@ def test_demo_dashboard_renders_real_dom(demo_url, tmp_path):
     assert "Reserve 192.168.1.112" in out
     assert "&lt;b&gt;stranger" in out  # untrusted name escaped, not injected as markup
     assert ">Mark as reserved<" in out  # the reservation banner button
+    assert "then press “Mark as reserved”." in out
+    assert '<code>02:00:00:00:00:01</code>' in out  # bold via .banner code, kept on one line
     assert "for this Home Assistant machine" in out and "this Pi" not in out
     assert "02:00:00:00:00:01" in out and "homeassistant" in out  # how to spot this machine in the router's list
     assert ">Mark as known<" in out  # on the unknown row

@@ -194,18 +194,22 @@ function renderBanner(s) {
   }
   if (s.address_reserved) return null;
   const addr = s.primary_address;
+  // Wide windows: text on the left, button centered on the right. Narrow: full-width button below (style.css).
   return h("div", { class: "banner" },
-    h("div", {},
-      (addr ? "Reserve " + addr + " for this Home Assistant machine"
-        : "Reserve this Home Assistant machine's address") +
-      " in your router's DHCP settings (often called a DHCP reservation or static lease), then press Mark as reserved."),
-    (s.pi_mac || s.pi_hostname) && h("div", {}, ...findPiHint(s)),
-    h("div", { class: "row" },
-      h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
-        : { type: "button", onclick: markReserved }, "Mark as reserved"),
-      reserveSaving && h("span", {}, "Saving…")),
-    reserveError && h("div", { class: "err" }, reserveError + " You can also turn on Address reserved in this " +
-      "app's Configuration."));
+    h("div", { class: "side" },
+      h("div", { class: "text" },
+        h("p", {},
+          (addr ? "Reserve " + addr + " for this Home Assistant machine"
+            : "Reserve this Home Assistant machine's address") +
+          " in your router's DHCP settings (often called a DHCP reservation or static lease), then press " +
+          "“Mark as reserved”."),
+        (s.pi_mac || s.pi_hostname) && h("p", {}, ...findPiHint(s)),
+        reserveError && h("p", { class: "err" }, reserveError + " You can also turn on Address reserved in this " +
+          "app's Configuration.")),
+      h("div", { class: "actions" },
+        h("button", reserveSaving ? { type: "button", disabled: "", onclick: markReserved }
+          : { type: "button", onclick: markReserved }, "Mark as reserved"),
+        reserveSaving && h("span", {}, "Saving…"))));
 }
 
 function renderAlerts(s) {
