@@ -8,7 +8,8 @@
 - The dashboard updates the moment something changes (a new Tang request, a dashboard action, a new address),
   instead of every 10 seconds. If the live connection drops, it falls back to checking every 10 seconds and
   reconnects on its own.
-- History shows the 10 newest requests, with a "Show all" button for the rest.
+- History shows the 10 newest requests, with a "Show all" button for the rest, and is now at the bottom of the
+  page so expanding it doesn't push everything else down.
 
 ## 0.1.8
 

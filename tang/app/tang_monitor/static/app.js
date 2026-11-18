@@ -320,8 +320,9 @@ function renderTestCommands(s) {
 
 function render(s) {
   const app = document.getElementById("app");
-  app.replaceChildren(...[renderStatus(s), renderBanner(s), renderAlerts(s), renderHistory(s),
-    renderKeys(s), renderDevices(s), renderTestCommands(s)].flat().filter(Boolean));
+  // History goes last: "Show all" can make it very long.
+  app.replaceChildren(...[renderStatus(s), renderBanner(s), renderAlerts(s), renderKeys(s), renderDevices(s),
+    renderTestCommands(s), renderHistory(s)].flat().filter(Boolean));
 }
 
 // Apply a state snapshot (JSON text). Held back while the user is selecting text on the page, so a re-render
