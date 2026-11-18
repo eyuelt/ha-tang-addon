@@ -54,6 +54,7 @@ def test_demo_dashboard_renders_real_dom(demo_url, tmp_path):
     assert not re.search(r"(^|>)\s*null\s*(<|$)", out, re.M)  # a stray "null" text node
     assert ">When<" in out and ">Who<" in out and ">Result<" in out
     assert "How to fix" in out
+    assert "No key available with this passphrase.\u201d before \u201cBinding edited successfully" in out
     assert "Reserve <code>192.168.1.112</code>" in out  # addresses are bold (.banner .text code)
     assert "&lt;b&gt;stranger" in out  # untrusted name escaped, not injected as markup
     assert ">Mark as reserved<" in out  # the reservation banner button

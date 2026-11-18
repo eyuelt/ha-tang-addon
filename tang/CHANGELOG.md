@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- The dashboard now shows the "How to test" and "How to fix" commands. They have been run on a real LUKS2 disk
+  (clevis 22): finding the disk and slot, the test command, and both one-step scripts.
+- The fix instructions say that "No key available with this passphrase." is a normal line in its output.
+
 ## 0.1.8
 
 - Tang's port can be changed in the app's Network settings; the generated commands and docs use whichever port is set.

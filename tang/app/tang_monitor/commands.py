@@ -5,8 +5,8 @@ from typing import Literal
 
 from .keys import KeyInfo
 
-# Hidden in the dashboard until the commands are verified on a real disk.
-COMMANDS_VERIFIED: bool = False
+# Verified on a real LUKS2 disk with clevis 22 (find steps, test command, both one-step scripts).
+COMMANDS_VERIFIED: bool = True
 
 
 def commands_verified() -> bool:

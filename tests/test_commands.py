@@ -81,8 +81,8 @@ def test_device_commands_shape():
     assert "SIGS256" in d["fix"] and "EX1S256" in d["one_step_fix"]
 
 
-def test_commands_hidden_by_default():
-    assert commands.COMMANDS_VERIFIED is False
+def test_commands_shown_after_verification():
+    assert commands.COMMANDS_VERIFIED is True
 
 
 @pytest.mark.parametrize("mode", ["edit", "test"])
@@ -97,6 +97,7 @@ def test_found_set_after_found_echo_not_in_action(mode):
 
 @pytest.mark.parametrize("env,expected", [(None, False), ("1", True), ("0", False), ("true", False), ("", False)])
 def test_commands_verified_env_override(monkeypatch, env, expected):
+    monkeypatch.setattr(commands, "COMMANDS_VERIFIED", False)  # the env var alone decides
     if env is None:
         monkeypatch.delenv("TANG_COMMANDS_VERIFIED", raising=False)
     else:

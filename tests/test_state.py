@@ -89,7 +89,9 @@ async def test_forget(tmp_path):
     assert s.snapshot()["devices"] == []
 
 
-async def test_snapshot_commands_null_when_unverified(tmp_path):
+async def test_snapshot_commands_null_when_unverified(tmp_path, monkeypatch):
+    monkeypatch.setattr(commands, "COMMANDS_VERIFIED", False)
+    monkeypatch.delenv("TANG_COMMANDS_VERIFIED", raising=False)
     s = await flagged_state(tmp_path)
     snap = s.snapshot()
     assert snap["commands_verified"] is False

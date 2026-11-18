@@ -92,8 +92,13 @@ function oneStep(idPrefix, c, withFix) {
     h("p", { class: "muted" },
       "This script finds every binding to this Tang server on this machine and acts on each one."),
     withFix && h("p", {}, "Fix everything it finds:"), withFix && cmd(c.one_step_fix),
+    withFix && h("p", { class: "muted" }, EDIT_NOTE),
     h("p", {}, "Test everything it finds:"), cmd(c.one_step_test));
 }
+
+const EDIT_NOTE = "Fixing may print \u201cNo key available with this passphrase.\u201d before " +
+  "\u201cBinding edited successfully\u201d. That line is normal: Clevis first checks for an empty password, " +
+  "then unlocks with the existing binding.";
 
 const TEST_NOTE = "The test proves this machine can fetch its key from the new address. " +
   "It does not prove the boot-time network works; only restarting the machine does.";
@@ -102,6 +107,7 @@ function fixDetails(dev, c) {
   return details("fix:" + dev.device, "How to fix",
     h("p", {}, "1. Find the disk and binding slot."), findSteps(c.find),
     h("p", {}, "2. Point the binding at this Home Assistant machine."), cmd(c.fix),
+    h("p", { class: "muted" }, EDIT_NOTE),
     h("p", {}, "3. Test it."), cmd(c.test), h("p", { class: "muted" }, TEST_NOTE),
     oneStep("fix:" + dev.device, c, true));
 }

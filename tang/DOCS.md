@@ -39,8 +39,10 @@ Keep that port reachable only from your home network. Do not forward it from the
    ```
 
    Find `<disk>` with `lsblk -o NAME,FSTYPE,FSVER,MOUNTPOINTS` and `<slot>` with `sudo clevis luks list -d <disk>`.
-   The dashboard's "How to test" and "How to fix" sections will appear in a later version, once the commands
-   have been verified.
+   The dashboard's "How to test" section shows these commands ready to copy, plus a script that finds and tests
+   every binding to this Tang server. If a device is flagged, its "How to fix" section shows the command that
+   points its binding at the current address. Fixing may print `No key available with this passphrase.` before
+   `Binding edited successfully`; that line is normal (Clevis first checks for an empty password).
 
 ## Options
 
