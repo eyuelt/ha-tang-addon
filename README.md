@@ -17,7 +17,8 @@ Tang must only be reachable from your home network. Do not port-forward Tang's p
 
 ## Documentation
 
-See [tang/DOCS.md](tang/DOCS.md) for setup and usage.
+See [tang/DOCS.md](tang/DOCS.md) for setup and usage, and [docs/DESIGN.md](docs/DESIGN.md) for why it works the way it
+does.
 
 ## Credits
 
