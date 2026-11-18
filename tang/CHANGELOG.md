@@ -5,6 +5,10 @@
 - The dashboard now shows the "How to test" and "How to fix" commands. They have been run on a real LUKS2 disk
   (clevis 22): finding the disk and slot, the test command, and both one-step scripts.
 - The fix instructions say that "No key available with this passphrase." is a normal line in its output.
+- The dashboard updates the moment something changes (a new Tang request, a dashboard action, a new address),
+  instead of every 10 seconds. If the live connection drops, it falls back to checking every 10 seconds and
+  reconnects on its own.
+- History shows the 10 newest requests, with a "Show all" button for the rest.
 
 ## 0.1.8
 

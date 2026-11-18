@@ -81,6 +81,7 @@ async def refresh(state: AppState, sup: Supervisor, session: aiohttp.ClientSessi
     options = await sup.get_options()  # Configuration-tab edits apply here, with no restart
     if options is not None:
         state.update_options(options_from_dict(options))
+    state.changes.notify()
     await publish(state, sup)
 
 

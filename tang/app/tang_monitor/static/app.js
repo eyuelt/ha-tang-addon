@@ -1,12 +1,14 @@
 "use strict";
 // All server-provided strings are inserted with textContent (via h()), never innerHTML.
-const POLL_MS = 10000;
+const POLL_MS = 10000;  // only while the live connection is down
+const HISTORY_SHORT = 10;
+let historyAll = false;  // "Show all" in History
 const openDetails = new Set();
 let lastState = null;
 let lastText = null;
 let pendingForget = null;  // device id awaiting the inline "Forget? Yes / Cancel" confirmation
 let forgetNote = null;
-// Reservation banner state lives at module level so the 10-second poll's re-render can't cut the
+// Reservation banner state lives at module level so a re-render from a state update can't cut the
 // confirmation short or bring the yellow banner back.
 let reserveSaving = false;
 let reserveError = null;
@@ -251,7 +253,11 @@ function renderAlerts(s) {
 }
 
 function renderHistory(s) {
-  const rows = s.requests.map(r => h("tr", { class: r.known ? "" : "unknown" },
+  const shown = historyAll ? s.requests : s.requests.slice(0, HISTORY_SHORT);
+  const more = s.requests.length > HISTORY_SHORT && h("p", {},
+    h("button", { type: "button", onclick: () => { historyAll = !historyAll; render(lastState); } },
+      historyAll ? "Show fewer" : "Show all"));
+  const rows = shown.map(r => h("tr", { class: r.known ? "" : "unknown" },
     h("td", {}, fmtTime(r.at)),
     h("td", {}, r.device, !r.known && h("span", { class: "tag" }, " ⚠ unknown"),
       !r.known && h("button", { type: "button", class: "small",
@@ -260,7 +266,8 @@ function renderHistory(s) {
     h("td", { class: result(r) === "error" ? "err" : "" }, result(r))));
   return [h("h2", {}, "History"), h("div", { class: "scroll" }, h("table", {},
     h("thead", {}, h("tr", {}, h("th", {}, "When"), h("th", {}, "Who"), h("th", {}, "IP"), h("th", {}, "Result"))),
-    h("tbody", {}, rows.length ? rows : h("tr", {}, h("td", { colspan: 4, class: "muted" }, "No requests yet."))))) ];
+    h("tbody", {}, rows.length ? rows : h("tr", {}, h("td", { colspan: 4, class: "muted" }, "No requests yet."))))),
+    more];
 }
 
 function renderKeys(s) {
@@ -317,24 +324,80 @@ function render(s) {
     renderKeys(s), renderDevices(s), renderTestCommands(s)].flat().filter(Boolean));
 }
 
+// Apply a state snapshot (JSON text). Held back while the user is selecting text on the page, so a re-render
+// doesn't wipe out what they're copying; applied when the selection ends.
+let pendingText = null;
+
+function selecting() {
+  const sel = window.getSelection();
+  const app = document.getElementById("app");
+  return sel && !sel.isCollapsed && sel.anchorNode && app.contains(sel.anchorNode);
+}
+
+function apply(text) {
+  if (selecting()) { pendingText = text; return; }
+  pendingText = null;
+  if (text === lastText) return;
+  lastText = text;
+  lastState = JSON.parse(text);
+  // Don't rebuild the banner mid-fade (a new element would jump to transparent); the fade's end timer re-renders.
+  if (reserveConfirm !== "fading") render(lastState);
+}
+
+document.addEventListener("selectionchange", () => {
+  if (pendingText !== null && !selecting()) apply(pendingText);
+});
+
 async function refresh() {
   try {
     const r = await fetch("api/state");
     if (!r.ok) throw new Error("HTTP " + r.status);
-    const text = await r.text();
-    const sel = window.getSelection();
-    const app = document.getElementById("app");
-    const selecting = sel && !sel.isCollapsed && sel.anchorNode && app.contains(sel.anchorNode);
-    if (text === lastText || selecting) return;
-    lastText = text;
-    lastState = JSON.parse(text);
-    // Don't rebuild the banner mid-fade (a new element would jump to transparent); the fade's end timer re-renders.
-    if (reserveConfirm !== "fading") render(lastState);
+    apply(await r.text());
   } catch (e) {
     const app = document.getElementById("app");
     if (!lastState) app.replaceChildren(h("p", { class: "err" }, "Could not load state: " + e));
   }
 }
 
+// Live updates: the server pushes the state when it changes. While the connection is down, poll and retry.
+let socket = null;
+let pollTimer = null;
+let retryTimer = null;
+let retryMs = 1000;
+
+function startPolling() {
+  if (!pollTimer) pollTimer = setInterval(refresh, POLL_MS);
+}
+
+function connect() {
+  clearTimeout(retryTimer);
+  retryTimer = null;
+  if (socket || !window.WebSocket) { if (!window.WebSocket) startPolling(); return; }
+  const url = new URL("api/ws", location.href);
+  url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  let ws;
+  try { ws = new WebSocket(url); } catch (e) { startPolling(); return; }
+  socket = ws;
+  startPolling();  // until it opens; a connection can hang while connecting
+  ws.onopen = () => {
+    retryMs = 1000;
+    clearInterval(pollTimer);
+    pollTimer = null;
+  };
+  ws.onmessage = ev => apply(ev.data);
+  ws.onclose = () => {
+    if (socket !== ws) return;
+    socket = null;
+    startPolling();
+    refresh();
+    retryTimer = setTimeout(connect, retryMs);
+    retryMs = Math.min(retryMs * 2, 30000);
+  };
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !socket) { retryMs = 1000; connect(); refresh(); }
+});
+
 refresh();
-setInterval(refresh, POLL_MS);
+connect();

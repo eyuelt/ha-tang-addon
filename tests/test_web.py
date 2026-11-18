@@ -140,3 +140,37 @@ async def test_address_reserved_route(aiohttp_client, tmp_path):
     for body in ({"reserved": "yes"}, {"x": 1}, [True], 5):
         assert (await c.post("/api/address-reserved", json=body)).status == 400
     assert (await c.post("/api/address-reserved", data="not json")).status == 400
+
+
+async def test_ws_pushes_state_now_and_after_each_change(aiohttp_client, tmp_path):
+    import asyncio
+    s, c = await make_client(aiohttp_client, tmp_path)
+    ws = await c.ws_connect("/api/ws")
+    first = await asyncio.wait_for(ws.receive_json(), 2)
+    assert len(first["requests"]) == 1
+    await s.handle_request(TangRequest(T, "1.1.1.1", "192.168.1.112:7500", "adv", 200))  # a new Tang request
+    assert len((await asyncio.wait_for(ws.receive_json(), 2))["requests"]) == 2
+    assert (await c.post("/api/devices/d.lan/forget")).status == 200  # a dashboard action
+    assert (await asyncio.wait_for(ws.receive_json(), 2))["devices"] == []
+    s.changes.notify()  # nothing changed: no duplicate message
+    try:
+        msg = await asyncio.wait_for(ws.receive_json(), 0.3)
+        raise AssertionError(f"unexpected push: {msg}")
+    except asyncio.TimeoutError:
+        pass
+    await ws.close()
+
+
+async def test_ws_rejects_non_ingress_remote(aiohttp_client, tmp_path):
+    _, c = await make_client(aiohttp_client, tmp_path, frozenset({"172.30.32.2"}))
+    assert (await c.get("/api/ws")).status == 403
+
+
+async def test_ws_closed_on_shutdown(aiohttp_client, tmp_path):
+    import asyncio
+    s, c = await make_client(aiohttp_client, tmp_path)
+    ws = await c.ws_connect("/api/ws")
+    await asyncio.wait_for(ws.receive_json(), 2)
+    await c.app.shutdown()
+    msg = await asyncio.wait_for(ws.receive(), 2)
+    assert msg.type.name in ("CLOSE", "CLOSED", "CLOSING")

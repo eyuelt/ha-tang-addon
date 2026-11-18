@@ -1,4 +1,5 @@
 """Application state tying keys, request log, device store and address checks together."""
+import asyncio
 import ipaddress
 from dataclasses import replace
 from pathlib import Path
@@ -24,6 +25,21 @@ def endpoint(address: str, port: int | None) -> str:
     return f"[{address}]:{port}" if ":" in address else f"{address}:{port}"
 
 
+class Changes:
+    """Wakes dashboard connections when the state may have changed. They re-check and skip identical snapshots."""
+
+    def __init__(self) -> None:
+        self._event = asyncio.Event()
+
+    def next(self) -> asyncio.Event:
+        """Take this before reading the state, so a change made in between still wakes you."""
+        return self._event
+
+    def notify(self) -> None:
+        self._event.set()
+        self._event = asyncio.Event()
+
+
 MISMATCH_CHECKS = 3  # consecutive mismatching checks before a device is flagged
 
 
@@ -46,6 +62,7 @@ class AppState:
         self.log = RequestLog(data_dir / "requests.json")
         self.store = DeviceStore(data_dir / "devices.json")
         self.known = KnownDevices(data_dir / "known.json")
+        self.changes = Changes()
 
     @staticmethod
     def _name_of(entry: LoggedRequest) -> str | None:
@@ -84,6 +101,7 @@ class AppState:
                 self._mismatches.pop(device, None)
             self.store.put(apply_success(self.store.get(device), device, addr, req.at,
                                          self.pi_addresses, port, self._tang_port()))
+        self.changes.notify()
         return entry
 
     def set_pi_addresses(self, addrs: set[str] | None, primary: str | None = None) -> None:

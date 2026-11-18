@@ -127,9 +127,11 @@ async def test_refresh_unreachable_tang_is_not_running(tmp_path):
     import aiohttp
     state, sup = make_state(tmp_path), FakeSupervisor()
     state.tang_running = True
+    changed = state.changes.next()
     async with aiohttp.ClientSession() as session:
         await main.refresh(state, sup, session, "http://127.0.0.1:1/adv")
     assert state.tang_running is False
+    assert changed.is_set()  # open dashboards are told to re-check
 
 
 async def test_refresh_loop_survives_a_failing_iteration(tmp_path, caplog):
