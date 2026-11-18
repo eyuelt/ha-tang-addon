@@ -43,11 +43,14 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: v
 details { margin-top: 6px; }
 details details { margin-left: 12px; }
 summary { cursor: pointer; font-weight: 600; }
+details.section { margin-top: 0; }
+details.section > summary h2 { display: inline; }  /* the section heading is the toggle */
+details.section > summary { margin: 22px 0 8px; color: var(--muted); }
 button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line);
   background: var(--card); color: var(--fg); cursor: pointer; }
 button:hover { border-color: var(--accent); }
 pre { background: var(--code-bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px;
-  padding: 8px; overflow-x: auto; margin: 4px 0; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  padding: 8px; overflow-x: auto; margin: 4px 0; font-size: 12px; white-space: pre-wrap; word-break: normal; overflow-wrap: anywhere; }  /* wrap at spaces when possible */
 .cmd { display: flex; gap: 8px; align-items: flex-start; }
 .cmd pre { flex: 1; }
 table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
@@ -58,5 +61,6 @@ tr.unknown td { background: var(--unk-bg); }
 .err { color: var(--bad-fg); }
 code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }
 .scroll { overflow-x: auto; }
-td.mono { word-break: normal; white-space: nowrap; }  /* keep IP addresses on one line */
+td.mono { word-break: normal; white-space: nowrap; }
+.card p code { word-break: normal; white-space: nowrap; }  /* short inline commands stay whole */  /* keep IP addresses on one line */
 button.small { padding: 0 6px; font-size: 0.85em; margin-left: 6px; }

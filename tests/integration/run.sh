@@ -112,15 +112,17 @@ for k in keys:
     assert k.file_stem in (k.s256, k.s1), k
     print(k.use, k.file_stem)
 ' || fail "key file stem does not match its thumbprint"
-for stem in $(docker exec "$TANG" sh -c 'cd /data/keys && ls *.jwk' | sed 's/\.jwk$//'); do
+for stem in $(docker exec "$TANG" sh -c 'cd /data/keys && ls -- *.jwk' | sed 's/\.jwk$//'); do
   jwk=$(docker exec "$TANG" cat "/data/keys/$stem.jwk")
   s256=$(echo "$jwk" | docker exec -i "$CLIENT" jose jwk thp -i- -a S256)
   s1=$(echo "$jwk" | docker exec -i "$CLIENT" jose jwk thp -i- -a S1)
   echo "$STATE" | jqc -e --arg a "$s256" --arg b "$s1" 'any(.keys[]; .s256==$a and .s1==$b)' >/dev/null \
     || fail "jose thumbprints of $stem ($s256, $s1) differ from api/state keys"
 done
+CHECKED=$(docker exec "$TANG" sh -c 'cd /data/keys && ls -- *.jwk' | wc -l)
+[ "$CHECKED" -ge 2 ] || fail "expected at least 2 key files, found $CHECKED"
 
-echo "== LUKS2 one-step test script"
+echo "== LUKS2 one-step fix-and-test script"
 if LOOP=$(docker exec "$CLIENT" sh -c 'truncate -s 64M /disk.img && losetup -f --show /disk.img' 2>/dev/null) \
     && [ -n "$LOOP" ] && docker exec "$CLIENT" test -b "$LOOP"; then
   docker exec "$CLIENT" sh -c "printf %s test | cryptsetup luksFormat --type luks2 --batch-mode --key-file=- $LOOP"
@@ -134,10 +136,23 @@ if LOOP=$(docker exec "$CLIENT" sh -c 'truncate -s 64M /disk.img && losetup -f -
   STATE2=$(api_state)
   [ "$(echo "$STATE2" | jqc -r '.keys[] | select(.use=="signing") | .s256')" = "$SIG" ] \
     || fail "keys changed across restart"
-  SCRIPT=$(echo "$STATE2" | jqc -er '.test_commands.one_step_test') || fail "no one_step_test in api/state"
+  # The dashboard's fix script, rendered by the app for this server's keys, repointing the binding at the same
+  # server (now with thp) and testing it.
+  SCRIPT=$(docker exec -e ALIAS="$ALIAS" "$TANG" python3 -c '
+import os
+from pathlib import Path
+from tang_monitor import commands
+from tang_monitor.keys import load_keys
+keys = load_keys(Path("/data/keys"))
+sig = next(k for k in keys if k.use == "signing")
+print(commands.one_step_fix_script(keys, commands.tang_config(os.environ["ALIAS"], 7500, sig)))
+') || fail "could not render the fix script"
   RESULT=$(printf '%s\n' "$SCRIPT" | docker exec -i "$CLIENT" sh 2>&1) || true
   echo "$RESULT"
-  echo "$RESULT" | grep -qx "OK: $LOOP slot 1" || fail "one-step script did not print 'OK: $LOOP slot 1'"
+  [ "$(echo "$RESULT" | grep -c "^Found binding")" = 1 ] || fail "fix script should find exactly one binding"
+  echo "$RESULT" | grep -qx "OK: $LOOP slot 1" || fail "fix script did not print 'OK: $LOOP slot 1'"
+  docker exec "$CLIENT" clevis luks list -d "$LOOP" | grep -q "^1: tang .*$ALIAS:7500" \
+    || fail "binding not at $ALIAS:7500 after the fix script"
   for _ in $(seq 1 30); do
     docker logs "$TANG" 2>&1 | grep -q "Supervisor network_info failed" && break
     sleep 1

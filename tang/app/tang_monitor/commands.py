@@ -1,11 +1,10 @@
 """Shell commands the user runs ON the encrypted device to repoint a Clevis Tang binding."""
 import json
 import os
-from typing import Literal
 
 from .keys import KeyInfo
 
-# Verified on a real LUKS2 disk with clevis 22 (find steps, test command, both one-step scripts).
+# Verified on a real LUKS2 disk with clevis 22: find steps, bind, test, and the one-step fix-and-test script.
 COMMANDS_VERIFIED: bool = True
 
 
@@ -39,6 +38,10 @@ def find_steps(old_address: str | None) -> list[dict]:
     ]
 
 
+def bind_command(config: str) -> str:
+    return f"sudo clevis luks bind -d <disk> tang '{config}'"
+
+
 def fix_command(config: str) -> str:
     return f"sudo clevis luks edit -d <disk> -s <slot> -c '{config}'"
 
@@ -66,29 +69,22 @@ done
 [ $found = 1 ] || echo "No binding to this Tang server found"
 '"""
 
-_EDIT_ACTION = 'clevis luks edit -d "$d" -s "$s" -c "$NEW_TANG_CONFIG"'
-_TEST_ACTION = (
+# Repoint the binding, then test it straight away (&& so a failed edit isn't reported as OK).
+_ACTION = (
+    'clevis luks edit -d "$d" -s "$s" -c "$NEW_TANG_CONFIG" && '
     'clevis luks pass -d "$d" -s "$s" >/dev/null && echo "OK: $d slot $s" '
     '|| echo "FAILED: $d slot $s"'
 )
 
 
-def one_step_script(
-    mode: Literal["edit", "test"], exchange_keys: list[KeyInfo], config: str | None = None
-) -> str:
+def one_step_fix_script(exchange_keys: list[KeyInfo], config: str) -> str:
+    """Find every binding to this Tang server (by key), point it at `config`, and test it."""
     fingerprints = " ".join(f"{k.s256} {k.s1}" for k in exchange_keys if k.use == "exchange")
-    if mode == "edit":
-        if config is None:
-            raise ValueError("edit mode requires a config")
-        if "'" in config:
-            raise ValueError("config must not contain single quotes")
-        escaped = config.replace("\\", "\\\\").replace('"', '\\"')
-        config_line = f'NEW_TANG_CONFIG="{escaped}"\n'
-        action = _EDIT_ACTION
-    else:
-        config_line = ""
-        action = _TEST_ACTION
-    return _TEMPLATE.format(fingerprints=fingerprints, config_line=config_line, action=action)
+    if "'" in config:
+        raise ValueError("config must not contain single quotes")
+    escaped = config.replace("\\", "\\\\").replace('"', '\\"')
+    return _TEMPLATE.format(fingerprints=fingerprints, config_line=f'NEW_TANG_CONFIG="{escaped}"\n',
+                            action=_ACTION)
 
 
 def device_commands(old_address: str, pi_address: str, port: int, keys: list[KeyInfo]) -> dict:
@@ -99,6 +95,5 @@ def device_commands(old_address: str, pi_address: str, port: int, keys: list[Key
         "find": find_steps(old_address),
         "fix": fix_command(config),
         "test": test_command(),
-        "one_step_fix": one_step_script("edit", exchange, config),
-        "one_step_test": one_step_script("test", exchange),
+        "one_step_fix": one_step_fix_script(exchange, config),
     }

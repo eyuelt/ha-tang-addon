@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1
+
+- "Test a newly bound device" is replaced by **Add a Linux device**, collapsed until you open it: install Clevis,
+  bind the disk (the command has this server's address, port and signing fingerprint filled in), set up the boot
+  image, test, restart.
+- **How to fix** is one script that points every binding to this Tang server at the current address and tests each
+  one straight away. "Step by step instead" does the same for a single binding you pick.
+- Steps are numbered once, in order (they had a nested 1, 2 inside step 1).
+- Commands wrap at spaces instead of mid-word on narrow screens.
+- Docs: setup steps for Linux devices, with per-distribution notes for the boot image.
+
 ## 0.2.0
 
 - The dashboard now shows the "How to test" and "How to fix" commands. They have been run on a real LUKS2 disk

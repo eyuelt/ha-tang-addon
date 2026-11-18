@@ -19,30 +19,46 @@ Keep that port reachable only from your home network. Do not forward it from the
 
 ## Setup
 
+Clevis runs on Linux, so devices must be Linux machines whose disk is encrypted with LUKS2. The dashboard's
+**Add a Linux device** section has these steps with this server's details filled in.
+
 1. Reserve the Home Assistant machine's address in your router first, as described above. Then press
    **Mark as reserved** on the yellow banner in the dashboard (or turn on **Address reserved** in this app's
    Configuration).
-2. Open the Tang panel, find the device's request in the history, and click **Mark as known**. No restart is needed.
-   (The **Known devices** option still works for listing devices ahead of time.)
-3. Bind a device. On the device, run:
+2. Install Clevis on the device:
+   - Debian or Ubuntu: `clevis clevis-luks clevis-initramfs`.
+   - Fedora: `clevis clevis-luks clevis-dracut`.
+   - Arch: `clevis`. Arch's default boot tool (mkinitcpio) has no built-in Clevis support; the
+     [Arch Wiki's Clevis page](https://wiki.archlinux.org/title/Clevis) lists the options.
+3. Bind the disk. On the device, run:
 
    ```sh
    sudo clevis luks bind -d <disk> tang '{"url":"http://<address>:<port>","thp":"<signing fingerprint from the dashboard>"}'
    ```
 
-   `<disk>` is the encrypted partition (for example `/dev/nvme0n1p2`), `<address>` is the Home Assistant machine's reserved address,
-   `<port>` is Tang's port (see above), and the signing fingerprint is shown in the dashboard's Keys section.
-4. Test it (this prints nothing secret and ends with `OK` on success):
+   `<disk>` is the encrypted partition (find it with `lsblk -o NAME,FSTYPE,FSVER,MOUNTPOINTS`: the
+   `crypto_LUKS` row), `<address>` is the Home Assistant machine's reserved address, `<port>` is Tang's port (see
+   above), and the signing fingerprint is shown in the dashboard's Keys section. It asks for the disk's password and
+   adds a new key slot; the password keeps working.
+4. Make sure the boot image includes Clevis and brings up the network, then rebuild it. This depends on the
+   distribution: on Debian and Ubuntu, `clevis-initramfs` adds itself (rebuild with `sudo update-initramfs -u`); on
+   Fedora, rebuild with `sudo dracut -f` and see Fedora's Clevis documentation for network options such as
+   `rd.neednet=1`; on Arch, follow the Arch Wiki page above.
+5. Test it (this prints nothing secret and ends with `OK` on success):
 
    ```
    sudo clevis luks pass -d <disk> -s <slot> >/dev/null && echo OK
    ```
 
-   Find `<disk>` with `lsblk -o NAME,FSTYPE,FSVER,MOUNTPOINTS` and `<slot>` with `sudo clevis luks list -d <disk>`.
-   The dashboard's "How to test" section shows these commands ready to copy, plus a script that finds and tests
-   every binding to this Tang server. If a device is flagged, its "How to fix" section shows the command that
-   points its binding at the current address. Fixing may print `No key available with this passphrase.` before
-   `Binding edited successfully`; that line is normal (Clevis first checks for an empty password).
+   Find `<slot>` with `sudo clevis luks list -d <disk>`: a freshly bound disk usually shows one `tang` line, and
+   the number at its start is the slot.
+6. Restart the device. It should unlock without asking for the password. Then find its request in the dashboard's
+   history and click **Mark as known** (or list it under **Known devices** ahead of time).
+
+If Tang's address or port changes later, the dashboard flags each device still using the old one, with a
+**How to fix** section: one script that points every binding to this Tang server at the current address and tests
+it, or step by step for a single binding you pick. Fixing may print `No key available with this passphrase.` before
+`Binding edited successfully`; that line is normal (Clevis first checks for an empty password).
 
 ## Options
 

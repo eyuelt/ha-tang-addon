@@ -58,6 +58,20 @@ def test_demo_dashboard_renders_real_dom(demo_url, tmp_path):
     history = out.split(">History<", 1)[1].split("</table>", 1)[0]
     assert history.count("<tr") == 1 + 10  # header + 10 rows
     assert ">Show all<" in out
+    # The test section says what it's for, and its steps and the fix steps are numbered once, in order.
+    # "Add a Linux device" starts collapsed: one heading that opens the steps.
+    assert re.search(r'<details class="section"[^>]*><summary><h2>Add a Linux device</h2></summary>', out)
+    assert "For a Linux machine whose disk is encrypted with LUKS2." in out
+    assert not re.search(r'<details class="section"[^>]*open', out)  # collapsed
+    assert "sudo clevis luks bind -d &lt;disk&gt; tang '{\"url\":\"http://192.168.1.112:7500\"," in out
+    assert ">3. Bind the disk to this Tang server. It asks for the disk's password.<" in out
+    assert ">6. Test it. It prints OK when the device gets its key from here, and changes nothing.<" in out
+    assert "7. Restart the device." in out
+    # Fixing: one script that repoints and tests, then step by step (one binding) behind its own toggle.
+    assert "points it at the current address, and tests it" in out
+    assert "Works on the one binding you pick" in out
+    assert ">Step by step instead<" in out and "1. Find the disk and binding slot." not in out
+    assert ">3. Point the binding at this Home Assistant machine.<" in out and ">4. Test it." in out
     assert out.index(">History<") > max(out.index(">Keys<"), out.index(">Devices<"))  # last: it can get long
     assert "No key available with this passphrase.\u201d before \u201cBinding edited successfully" in out
     assert "Reserve <code>192.168.1.112</code>" in out  # addresses are bold (.banner .text code)

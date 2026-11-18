@@ -192,7 +192,6 @@ class AppState:
         verified = commands.commands_verified()
         primary = self.primary_address()
         can_cmd = verified and primary is not None and self._has_signing()
-        exchange = [k for k in self.keys if k.use == "exchange"]
         recent = self.log.recent()
         last_ip: dict[str, str] = {}
         for e in recent:  # newest first, so the first entry per device is its latest request
@@ -210,10 +209,14 @@ class AppState:
                 "address_ok": address_ok(r, self.pi_addresses), "commands": cmds})
         test_commands = None
         if verified:
+            signing = next((k for k in self.keys if k.use == "signing"), None)
+            bind = None  # needs this machine's address and the signing key
+            if primary is not None and signing is not None:
+                bind = commands.bind_command(commands.tang_config(primary, self.port, signing))
             test_commands = {
                 "find": commands.find_steps(None),
-                "test": commands.test_command(),
-                "one_step_test": commands.one_step_script("test", exchange, None)}
+                "bind": bind,
+                "test": commands.test_command()}
         return {
             "running": self.tang_running,
             "primary_address": primary,

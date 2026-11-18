@@ -85,18 +85,13 @@ function cmd(text) {
   return h("div", { class: "cmd" }, pre, copyBtn(text, pre));
 }
 
-function findSteps(steps) {
-  return steps.map((s, i) => h("div", {}, h("p", {}, (i + 1) + ". " + s.text), cmd(s.command)));
+// A numbered step: "n. text" and its command.
+function step(n, s) {
+  return h("div", {}, h("p", {}, n + ". " + s.text), cmd(s.command));
 }
 
-function oneStep(idPrefix, c, withFix) {
-  return details(idPrefix + ":onestep", "Can't tell which binding is the right one?",
-    h("p", { class: "muted" },
-      "This script finds every binding to this Tang server on this machine and acts on each one."),
-    withFix && h("p", {}, "Fix everything it finds:"), withFix && cmd(c.one_step_fix),
-    withFix && h("p", { class: "muted" }, EDIT_NOTE),
-    h("p", {}, "Test everything it finds:"), cmd(c.one_step_test));
-}
+const STEP_BY_STEP_WHY = "Works on the one binding you pick, instead of every binding to this Tang server, " +
+  "using short commands you can read before running them with sudo.";
 
 const EDIT_NOTE = "Fixing may print \u201cNo key available with this passphrase.\u201d before " +
   "\u201cBinding edited successfully\u201d. That line is normal: Clevis first checks for an empty password, " +
@@ -106,12 +101,17 @@ const TEST_NOTE = "The test proves this machine can fetch its key from the new a
   "It does not prove the boot-time network works; only restarting the machine does.";
 
 function fixDetails(dev, c) {
-  return details("fix:" + dev.device, "How to fix",
-    h("p", {}, "1. Find the disk and binding slot."), findSteps(c.find),
-    h("p", {}, "2. Point the binding at this Home Assistant machine."), cmd(c.fix),
-    h("p", { class: "muted" }, EDIT_NOTE),
-    h("p", {}, "3. Test it."), cmd(c.test), h("p", { class: "muted" }, TEST_NOTE),
-    oneStep("fix:" + dev.device, c, true));
+  const id = "fix:" + dev.device;
+  return details(id, "How to fix",
+    h("p", {}, "Run this on ", h("code", {}, dev.device), ". It finds every binding to this Tang server on " +
+      "that machine, points it at the current address, and tests it: OK means the device got its key from here."),
+    cmd(c.one_step_fix), h("p", { class: "muted" }, EDIT_NOTE), h("p", { class: "muted" }, TEST_NOTE),
+    details(id + ":steps", "Step by step instead",
+      h("p", { class: "muted" }, STEP_BY_STEP_WHY),
+      step(1, c.find[0]), step(2, c.find[1]),
+      step(3, { text: "Point the binding at this Home Assistant machine.", command: c.fix }),
+      h("p", { class: "muted" }, EDIT_NOTE),
+      step(4, { text: "Test it. It prints OK when the device gets its key from here.", command: c.test })));
 }
 
 async function post(path) {
@@ -307,22 +307,41 @@ function renderDevices(s) {
   return [h("h2", {}, "Devices"), h("div", { class: "card" }, body, note)];
 }
 
-function renderTestCommands(s) {
+function renderAddDevice(s) {
   const t = s.test_commands;
   if (!t) return null;
-  return [h("h2", {}, "Test a newly bound device"), h("div", { class: "card" },
-    details("test:new", "How to test",
-      h("p", {}, "1. Find the disk and binding slot."), findSteps(t.find),
-      h("p", {}, "2. Test it."), cmd(t.test), h("p", { class: "muted" }, TEST_NOTE),
-      details("test:new:onestep", "Can't tell which binding is the right one?",
-        cmd(t.one_step_test))))];
+  const id = "add";  // remembers whether it is open across re-renders
+  const sec = h("details", { class: "section" }, h("summary", {}, h("h2", {}, "Add a Linux device")),
+    h("div", { class: "card" },
+      h("p", {}, "For a Linux machine whose disk is encrypted with LUKS2. Once set up, it unlocks at boot by " +
+        "asking this Tang server, and its password still works whenever Tang can't be reached."),
+      !s.address_reserved && h("p", { class: "err" }, "Reserve this Home Assistant machine's address first " +
+        "(see the banner above). The binding stores the address."),
+      h("p", {}, "1. Install Clevis on the device. Debian or Ubuntu: ",
+        h("code", {}, "clevis clevis-luks clevis-initramfs"), ". Fedora: ",
+        h("code", {}, "clevis clevis-luks clevis-dracut"), ". Arch: ", h("code", {}, "clevis"),
+        " plus a boot hook (see this app's Documentation tab)."),
+      step(2, t.find[0]),
+      t.bind ? step(3, { text: "Bind the disk to this Tang server. It asks for the disk's password.",
+                         command: t.bind })
+        : h("p", {}, "3. Bind the disk. (The command appears once this machine's address is known.)"),
+      h("p", {}, "4. Make sure the device's boot image includes Clevis and its network. This depends on the " +
+        "distribution: see this app's Documentation tab."),
+      step(5, t.find[1]),
+      step(6, { text: "Test it. It prints OK when the device gets its key from here, and changes nothing.",
+                command: t.test }),
+      h("p", {}, "7. Restart the device. It should unlock without asking for the password.")));
+  sec.dataset.id = id;
+  if (openDetails.has(id)) sec.open = true;
+  sec.addEventListener("toggle", () => { if (sec.open) openDetails.add(id); else openDetails.delete(id); });
+  return sec;
 }
 
 function render(s) {
   const app = document.getElementById("app");
   // History goes last: "Show all" can make it very long.
   app.replaceChildren(...[renderStatus(s), renderBanner(s), renderAlerts(s), renderKeys(s), renderDevices(s),
-    renderTestCommands(s), renderHistory(s)].flat().filter(Boolean));
+    renderAddDevice(s), renderHistory(s)].flat().filter(Boolean));
 }
 
 // Apply a state snapshot (JSON text). Held back while the user is selecting text on the page, so a re-render

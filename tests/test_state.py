@@ -111,9 +111,11 @@ async def test_snapshot_commands_present_when_verified_and_flagged(tmp_path, mon
     snap = s.snapshot()
     assert snap["primary_address"] == "10.0.0.1"
     cmds = snap["devices"][0]["commands"]
-    assert set(cmds) == {"find", "fix", "test", "one_step_fix", "one_step_test"}
+    assert set(cmds) == {"find", "fix", "test", "one_step_fix"}
     assert "10.0.0.1:7500" in cmds["fix"]  # first IPv4 in sorted order
-    assert set(snap["test_commands"]) == {"find", "test", "one_step_test"}
+    assert set(snap["test_commands"]) == {"find", "bind", "test"}
+    assert snap["test_commands"]["bind"] == ("sudo clevis luks bind -d <disk> tang "
+                                             "'{\"url\":\"http://10.0.0.1:7500\",\"thp\":\"S256A\"}'")
     assert snap["pi_addresses"] == sorted(["fe80::1", "192.168.1.112", "10.0.0.1"])
 
 
@@ -131,7 +133,8 @@ async def test_snapshot_commands_shown_with_env_override(tmp_path, monkeypatch):
     monkeypatch.setenv("TANG_COMMANDS_VERIFIED", "1")
     snap = make_state(tmp_path).snapshot()
     assert snap["commands_verified"] is True
-    assert set(snap["test_commands"]) == {"find", "test", "one_step_test"}
+    assert set(snap["test_commands"]) == {"find", "bind", "test"}
+    assert snap["test_commands"]["bind"] is None  # no address known yet
 
 
 def flag_of(s):
